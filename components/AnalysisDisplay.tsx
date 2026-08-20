@@ -324,10 +324,10 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ analysis, tick
                 {analysis.news.map((item, index) => (
                   <li key={index} className="p-3 rounded-xl bg-gray-900/50 border border-gray-700/60 hover:border-cyan-500/50 transition-all">
                     <a 
-                      href={item.url} 
+                      href={item.url || (item as any).link || `https://www.google.com/search?q=${encodeURIComponent(item.title)}`} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="flex flex-col gap-2 group w-full"
+                      className="flex flex-col gap-2 group w-full cursor-pointer"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <span className="text-sm font-semibold text-gray-200 group-hover:text-cyan-300 transition-colors leading-snug">

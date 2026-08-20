@@ -1,6 +1,7 @@
 export interface StockNewsItem {
   title: string;
-  link?: string;
+  url: string;
+  link: string;
   publisher?: string;
   time?: string;
 }
@@ -48,7 +49,8 @@ async function fetchLatestStockNews(symbol: string): Promise<StockNewsItem[]> {
 
       items.push({
         title: rawTitle,
-        link,
+        url: link,
+        link: link,
         publisher: source || 'Tin tức tài chính',
         time: formattedTime
       });

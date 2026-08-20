@@ -67,6 +67,7 @@ export const normalizeNewsList = (rawNews: any, _groundingSources?: GroundingSou
         let title = '';
         let publisher = '';
         let time = '';
+        let originalUrl = '';
 
         if (typeof item === 'string') {
             title = item.trim();
@@ -74,6 +75,7 @@ export const normalizeNewsList = (rawNews: any, _groundingSources?: GroundingSou
             title = (item.title || item.headline || item.name || item.text || item.summary || '').trim();
             publisher = (item.publisher || item.source || item.site || '').trim();
             time = (item.time || item.date || item.publishedAt || '').trim();
+            originalUrl = (item.url || item.link || '').trim();
         }
 
         if (!title || title.length <= 5) return null;
@@ -81,14 +83,16 @@ export const normalizeNewsList = (rawNews: any, _groundingSources?: GroundingSou
         // Làm sạch tiêu đề (loại bỏ các dấu ngoặc kép thừa)
         const cleanTitle = title.replace(/["'\[\]]/g, '').trim();
 
-        // Tạo câu truy vấn Google chuẩn xác theo tiêu đề + tên báo + mã cổ phiếu
-        const searchQuery = publisher && !cleanTitle.toLowerCase().includes(publisher.toLowerCase())
-            ? `${cleanTitle} ${publisher}`
-            : (contextKeyword && !cleanTitle.toUpperCase().includes(contextKeyword.toUpperCase())
-                ? `${contextKeyword} ${cleanTitle}`
-                : cleanTitle);
-
-        const finalUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+        // Ưu tiên đường link bài báo gốc nếu có, nếu không có mới tạo link tìm kiếm Google
+        let finalUrl = originalUrl;
+        if (!finalUrl || !finalUrl.startsWith('http')) {
+            const searchQuery = publisher && !cleanTitle.toLowerCase().includes(publisher.toLowerCase())
+                ? `${cleanTitle} ${publisher}`
+                : (contextKeyword && !cleanTitle.toUpperCase().includes(contextKeyword.toUpperCase())
+                    ? `${contextKeyword} ${cleanTitle}`
+                    : cleanTitle);
+            finalUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+        }
 
         return { 
             title: cleanTitle, 
