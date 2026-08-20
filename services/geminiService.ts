@@ -538,48 +538,26 @@ const sendChatWithToolFallback = async (
   message: string,
   systemInstruction: string
 ): Promise<{ response: GenerateContentResponse; chat: Chat }> => {
-  // 1. Try with Google Search tool first
-  try {
-    const chat = ai.chats.create({
-      model: PRO_MODEL,
-      config: {
-        temperature: 0.1,
-        maxOutputTokens: 8192,
-        responseMimeType: 'application/json',
-        tools: [{ googleSearch: {} }],
-        systemInstruction,
-      },
-    });
-    const response = await chat.sendMessage({ message });
-    return { response, chat };
-  } catch (err: any) {
-    const msg = (err?.message || err?.toString() || '').toLowerCase();
-    const status = err?.status || err?.statusCode || err?.code;
-    const isToolOrQuotaError =
-      status === 429 ||
-      status === 404 ||
-      status === 403 ||
-      msg.includes('quota') ||
-      msg.includes('resource_exhausted') ||
-      msg.includes('rate limit') ||
-      msg.includes('too many requests');
-
-    if (isToolOrQuotaError) {
-      console.warn('⚠️ Google Search Tool hit quota limit. Switching to Direct Prompt AI...');
-      const fallbackChat = ai.chats.create({
-        model: PRO_MODEL,
-        config: {
-          temperature: 0.1,
-          maxOutputTokens: 8192,
-          responseMimeType: 'application/json',
-          systemInstruction,
-        },
-      });
-      const response = await fallbackChat.sendMessage({ message });
-      return { response, chat: fallbackChat };
-    }
-    throw err;
+  // Use direct JSON mode - no Google Search tool (incompatible with responseMimeType
+  // and always hits quota 0 on free tier anyway)
+  const chat = ai.chats.create({
+    model: PRO_MODEL,
+    config: {
+      temperature: 0.1,
+      maxOutputTokens: 8192,
+      responseMimeType: 'application/json',
+      systemInstruction,
+    },
+  });
+  const response = await chat.sendMessage({ message });
+  
+  // Safety check: ensure we got actual content back
+  const text = response.text || '';
+  if (!text.trim()) {
+    throw new Error('Gemini API trả về phản hồi rỗng. Vui lòng thử lại.');
   }
+  
+  return { response, chat };
 };
 
 const fetchStockAnalysisInternal = async (tickerSymbol: string, customPrice?: string): Promise<{ result: AnalysisResult; chat: Chat }> => {
