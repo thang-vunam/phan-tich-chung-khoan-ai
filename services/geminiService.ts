@@ -419,16 +419,31 @@ export interface RealtimeStockInfo {
     points: number;
     formatted: string;
     volume?: number;
+    highest?: number;
+    lowest?: number;
+    pctFromHigh?: number;
+    pctFromLow?: number;
+    trendDescription?: string;
   };
   hnxIndex?: {
     points: number;
     formatted: string;
     volume?: number;
+    highest?: number;
+    lowest?: number;
+    pctFromHigh?: number;
+    pctFromLow?: number;
+    trendDescription?: string;
   };
   upcomIndex?: {
     points: number;
     formatted: string;
     volume?: number;
+    highest?: number;
+    lowest?: number;
+    pctFromHigh?: number;
+    pctFromLow?: number;
+    trendDescription?: string;
   };
   source?: string;
   news?: Array<{
@@ -443,7 +458,7 @@ export interface RealtimeStockInfo {
 export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeStockInfo | null> => {
   const cleanTicker = ticker.trim().toUpperCase();
 
-  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Lấy Giá Live + Chỉ số 3 sàn (HOSE, HNX, UPCOM) + Tin tức 7 ngày gần nhất
+  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Lấy Giá Live + Chỉ số & Xu hướng động 3 sàn + Tin tức 7 ngày gần nhất
   try {
     const proxyRes = await fetch(`/api/stock-price?symbol=${cleanTicker}`);
     if (proxyRes.ok) {
@@ -458,14 +473,15 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
 
   // 2. Direct fetch fallback
   const to = Math.floor(Date.now() / 1000);
-  const from = to - 86400 * 7;
+  const fromStock = to - 86400 * 7;
+  const fromIndex = to - 86400 * 30;
   
   try {
     const [stockRes, indexRes, hnxRes, upcomRes] = await Promise.all([
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${to}&symbol=${cleanTicker}&resolution=1D`),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${to}&symbol=VNINDEX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${to}&symbol=HNX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${to}&symbol=UPCOM&resolution=1D`).catch(() => null)
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromStock}&to=${to}&symbol=${cleanTicker}&resolution=1D`),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${to}&symbol=VNINDEX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${to}&symbol=HNX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${to}&symbol=UPCOM&resolution=1D`).catch(() => null)
     ]);
 
     if (stockRes.ok) {
@@ -477,22 +493,51 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
         const lastVol = data.v ? data.v[data.v.length - 1] : 0;
         const actualPriceVND = Math.round(lastClose * 1000);
 
-        const getIdx = async (res: any) => {
+        const getDynamicIdx = async (res: any) => {
           if (!res || !res.ok) return undefined;
           try {
             const d = await res.json();
             if (d.c && d.c.length > 0) {
-              const pts = Number(d.c[d.c.length - 1].toFixed(2));
-              return { points: pts, formatted: `${pts.toLocaleString('vi-VN')} điểm`, volume: d.v?.slice(-1)[0] };
+              const count = d.c.length;
+              const cur = d.c[count - 1];
+              const sampleSize = Math.min(count, 15);
+              const highs = d.h ? d.h.slice(-sampleSize) : [cur];
+              const lows = d.l ? d.l.slice(-sampleSize) : [cur];
+              const highest = Math.max(...highs);
+              const lowest = Math.min(...lows);
+              const pctFromHigh = ((cur - highest) / highest) * 100;
+              const pctFromLow = ((cur - lowest) / lowest) * 100;
+              
+              let trendDescription = '';
+              if (pctFromHigh >= -0.8) {
+                trendDescription = `đang duy trì đà tăng mạnh, tiệm cận đỉnh ngắn hạn ${highest.toFixed(2)} điểm`;
+              } else if (pctFromHigh < -1.5 && pctFromLow > 0.4) {
+                trendDescription = `đang trong nhịp hồi phục kỹ thuật (+${pctFromLow.toFixed(1)}% từ đáy ${lowest.toFixed(2)} điểm) sau đợt điều chỉnh giảm từ đỉnh ngắn hạn ${highest.toFixed(2)} điểm (${pctFromHigh.toFixed(1)}%)`;
+              } else if (pctFromLow <= 0.4) {
+                trendDescription = `đang chịu áp lực điều chỉnh và kiểm định vùng hỗ trợ đáy ${lowest.toFixed(2)} điểm`;
+              } else {
+                trendDescription = `đang tích lũy trong biên độ ${lowest.toFixed(2)} - ${highest.toFixed(2)} điểm`;
+              }
+
+              return {
+                points: Number(cur.toFixed(2)),
+                formatted: `${Number(cur.toFixed(2)).toLocaleString('vi-VN')} điểm`,
+                highest: Number(highest.toFixed(2)),
+                lowest: Number(lowest.toFixed(2)),
+                pctFromHigh: Number(pctFromHigh.toFixed(2)),
+                pctFromLow: Number(pctFromLow.toFixed(2)),
+                volume: d.v ? d.v[count - 1] : undefined,
+                trendDescription
+              };
             }
           } catch (e) {}
           return undefined;
         };
 
         const [vnIndexInfo, hnxInfo, upcomInfo] = await Promise.all([
-          getIdx(indexRes),
-          getIdx(hnxRes),
-          getIdx(upcomRes)
+          getDynamicIdx(indexRes),
+          getDynamicIdx(hnxRes),
+          getDynamicIdx(upcomRes)
         ]);
         
         return {
@@ -517,12 +562,17 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
 
 const generateAnalysisPrompt = (tickerSymbol: string, customPrice?: string, realtimeInfo?: RealtimeStockInfo | null) => {
   const formattedDate = getCurrentDateString();
-  const vnIndexText = realtimeInfo?.vnIndex 
-    ? `${realtimeInfo.vnIndex.formatted}${realtimeInfo.vnIndex.volume ? ` (Khối lượng HOSE: ${realtimeInfo.vnIndex.volume.toLocaleString('vi-VN')} cp)` : ''}`
-    : `1.734,24 điểm (vùng 1.700 - 1.750 điểm)`;
+  const vnIndexDetail = realtimeInfo?.vnIndex 
+    ? `${realtimeInfo.vnIndex.formatted} (${realtimeInfo.vnIndex.trendDescription || 'đang giao dịch'})`
+    : `1.734,24 điểm (hồi phục kỹ thuật sau nhịp điều chỉnh từ đỉnh ngắn hạn 1.798 điểm)`;
 
-  const hnxText = realtimeInfo?.hnxIndex ? realtimeInfo.hnxIndex.formatted : '278,55 điểm';
-  const upcomText = realtimeInfo?.upcomIndex ? realtimeInfo.upcomIndex.formatted : '127,24 điểm';
+  const hnxDetail = realtimeInfo?.hnxIndex 
+    ? `${realtimeInfo.hnxIndex.formatted} (${realtimeInfo.hnxIndex.trendDescription || 'đang giao dịch'})`
+    : `278,55 điểm`;
+
+  const upcomDetail = realtimeInfo?.upcomIndex 
+    ? `${realtimeInfo.upcomIndex.formatted} (${realtimeInfo.upcomIndex.trendDescription || 'đang giao dịch'})`
+    : `127,24 điểm`;
 
   const priceContext = customPrice 
     ? `- Giá tùy chỉnh do người dùng nhập: ${customPrice} VND` 
@@ -547,10 +597,10 @@ BẮT BUỘC: Bạn PHẢI sử dụng và trích xuất các bài báo trong da
   return `Bạn là Giám đốc Phân tích Đầu tư Chứng khoán Cao cấp (Head of Equity Research) hàng đầu tại Việt Nam. Hãy lập BÁO CÁO PHÂN TÍCH CHUYÊN SÂU, TOÀN DIỆN VÀ SẮC BÉN về mã cổ phiếu "${tickerSymbol}".
 
 DỮ LIỆU THỊ TRƯỜNG THỰC TẾ TÍNH ĐẾN ${formattedDate}:
-- BỐI CẢNH CHỈ SỐ CÁC SÀN THỰC TẾ HÔM NAY:
-  * Sàn HOSE (VN-INDEX): ${vnIndexText}
-  * Sàn HNX (HNX-INDEX): ${hnxText}
-  * Sàn UPCOM (UPCOM-INDEX): ${upcomText}
+- BỐI CẢNH & XU HƯỚNG CHỈ SỐ CÁC SÀN THỰC TẾ HÔM NAY:
+  * Sàn HOSE (VN-INDEX): ${vnIndexDetail}
+  * Sàn HNX (HNX-INDEX): ${hnxDetail}
+  * Sàn UPCOM (UPCOM-INDEX): ${upcomDetail}
 ${priceContext}
 Trường "assumedDate" phải là ${formattedDate}.
 
@@ -558,8 +608,8 @@ ${newsContext}
 
 QUY TẮC BẮT BUỘC VỀ BỐI CẢNH CHỈ SỐ THỊ TRƯỜNG:
 - Xác định sàn niêm yết của "${tickerSymbol}" (HOSE, HNX hay UPCOM) để phân tích tương ứng.
-- Trường "marketSentiment", "vnIndexTrend" và "liquidity" BẮT BUỘC phải phân tích dựa trên mốc VN-Index thực tế hiện tại là ${vnIndexText} (hoặc HNX-Index ${hnxText} nếu là sàn HNX).
-- TUYỆT ĐỐI KHÔNG dùng các mốc 1.200 - 1.250 điểm từ các năm cũ!
+- Trường "marketSentiment", "vnIndexTrend" và "liquidity" BẮT BUỘC phải phân tích dựa trên bối cảnh nến thực tế của sàn: ${vnIndexDetail}.
+- TUYỆT ĐỐI KHÔNG tự ý suy diễn gán nhãn 'đỉnh lịch sử' hoặc dùng các mốc điểm cũ trong quá khứ!
 
 QUY TẮC BẮT BUỘC VỀ TỒN TẠI MÃ CỔ PHIẾU:
 - "${tickerSymbol}" BẮT BUỘC phải là một mã chứng khoán/cổ phiếu/chứng chỉ quỹ CÓ THẬT được niêm yết trên các sàn chứng khoán Việt Nam (HOSE, HNX, UPCOM).

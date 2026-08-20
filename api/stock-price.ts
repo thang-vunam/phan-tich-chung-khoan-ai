@@ -85,16 +85,17 @@ export default async function handler(req: any, res: any) {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const from = now - 86400 * 7;
-  const url = `https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${now}&symbol=${symbol}&resolution=1D`;
+  const fromStock = now - 86400 * 7;
+  const fromIndex = now - 86400 * 30; // 30 ngày nến để tính đỉnh đáy và xu hướng động
+  const url = `https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromStock}&to=${now}&symbol=${symbol}&resolution=1D`;
 
   try {
-    // Chạy song song: Lấy giá Live từ sàn + Chỉ số cả 3 sàn (HOSE, HNX, UPCOM) + Tin tức 7 ngày gần nhất
+    // Chạy song song: Lấy giá Live từ sàn + Nến 30 phiên của 3 sàn (HOSE, HNX, UPCOM) + Tin tức kép
     const [apiRes, vnIndexRes, hnxRes, upcomRes, newsItems] = await Promise.all([
       fetch(url),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${now}&symbol=VNINDEX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${now}&symbol=HNX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${now}&symbol=UPCOM&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${now}&symbol=VNINDEX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${now}&symbol=HNX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${now}&symbol=UPCOM&resolution=1D`).catch(() => null),
       fetchLatestStockNews(symbol)
     ]);
 
@@ -117,23 +118,47 @@ export default async function handler(req: any, res: any) {
       parseIndex(upcomRes)
     ]);
 
-    const getIndexInfo = (data: any, name: string) => {
-      if (data && data.c && data.c.length > 0) {
-        const idxClose = data.c[data.c.length - 1];
-        const idxVol = data.v ? data.v[data.v.length - 1] : undefined;
-        return {
-          name,
-          points: Number(idxClose.toFixed(2)),
-          formatted: `${Number(idxClose.toFixed(2)).toLocaleString('vi-VN')} điểm`,
-          volume: idxVol
-        };
+    const computeDynamicTrend = (data: any, name: string) => {
+      if (!data || !data.c || data.c.length === 0) return undefined;
+      const count = data.c.length;
+      const current = data.c[count - 1];
+      const sampleSize = Math.min(count, 15);
+      const highs = data.h ? data.h.slice(-sampleSize) : [current];
+      const lows = data.l ? data.l.slice(-sampleSize) : [current];
+      
+      const highest = Math.max(...highs);
+      const lowest = Math.min(...lows);
+      
+      const pctFromHigh = ((current - highest) / highest) * 100;
+      const pctFromLow = ((current - lowest) / lowest) * 100;
+      
+      let trendDescription = '';
+      if (pctFromHigh >= -0.8) {
+        trendDescription = `đang duy trì đà tăng mạnh, tiệm cận/kiểm định đỉnh ngắn hạn ${highest.toFixed(2)} điểm`;
+      } else if (pctFromHigh < -1.5 && pctFromLow > 0.4) {
+        trendDescription = `đang trong nhịp hồi phục kỹ thuật (+${pctFromLow.toFixed(1)}% từ đáy ${lowest.toFixed(2)} điểm) sau đợt điều chỉnh giảm từ đỉnh ngắn hạn ${highest.toFixed(2)} điểm (${pctFromHigh.toFixed(1)}%)`;
+      } else if (pctFromLow <= 0.4) {
+        trendDescription = `đang chịu áp lực điều chỉnh và kiểm định vùng hỗ trợ đáy ${lowest.toFixed(2)} điểm`;
+      } else {
+        trendDescription = `đang dao động tích lũy trong biên độ ${lowest.toFixed(2)} - ${highest.toFixed(2)} điểm`;
       }
-      return undefined;
+
+      return {
+        name,
+        points: Number(current.toFixed(2)),
+        formatted: `${Number(current.toFixed(2)).toLocaleString('vi-VN')} điểm`,
+        highest: Number(highest.toFixed(2)),
+        lowest: Number(lowest.toFixed(2)),
+        pctFromHigh: Number(pctFromHigh.toFixed(2)),
+        pctFromLow: Number(pctFromLow.toFixed(2)),
+        volume: data.v ? data.v[count - 1] : undefined,
+        trendDescription
+      };
     };
 
-    const vnIndexInfo = getIndexInfo(vnData, 'VN-INDEX');
-    const hnxInfo = getIndexInfo(hnxData, 'HNX-INDEX');
-    const upcomInfo = getIndexInfo(upcomData, 'UPCOM-INDEX');
+    const vnIndexInfo = computeDynamicTrend(vnData, 'VN-INDEX');
+    const hnxInfo = computeDynamicTrend(hnxData, 'HNX-INDEX');
+    const upcomInfo = computeDynamicTrend(upcomData, 'UPCOM-INDEX');
 
     const data = await apiRes.json();
     if (data.c && data.c.length > 0) {
