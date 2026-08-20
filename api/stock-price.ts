@@ -74,14 +74,33 @@ export default async function handler(req: any, res: any) {
   const url = `https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${now}&symbol=${symbol}&resolution=1D`;
 
   try {
-    // Chạy song song: Lấy giá Live từ sàn + Lấy tin tức 7 ngày gần nhất
-    const [apiRes, newsItems] = await Promise.all([
+    // Chạy song song: Lấy giá Live từ sàn + Chỉ số VN-Index thực tế + Tin tức 7 ngày gần nhất
+    const [apiRes, indexRes, newsItems] = await Promise.all([
       fetch(url),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${now}&symbol=VNINDEX&resolution=1D`).catch(() => null),
       fetchLatestStockNews(symbol)
     ]);
 
     if (!apiRes.ok) {
       return res.status(apiRes.status).json({ error: `DNSE API returned status ${apiRes.status}` });
+    }
+
+    let vnIndexInfo: { points: number; formatted: string; volume?: number } | undefined;
+    if (indexRes && indexRes.ok) {
+      try {
+        const indexData = await indexRes.json();
+        if (indexData.c && indexData.c.length > 0) {
+          const idxClose = indexData.c[indexData.c.length - 1];
+          const idxVol = indexData.v ? indexData.v[indexData.v.length - 1] : undefined;
+          vnIndexInfo = {
+            points: Number(idxClose.toFixed(2)),
+            formatted: `${Number(idxClose.toFixed(2)).toLocaleString('vi-VN')} điểm`,
+            volume: idxVol
+          };
+        }
+      } catch (e) {
+        // ignore
+      }
     }
 
     const data = await apiRes.json();
@@ -100,6 +119,7 @@ export default async function handler(req: any, res: any) {
         high: Math.round(lastHigh * 1000),
         low: Math.round(lastLow * 1000),
         volume: lastVol,
+        vnIndex: vnIndexInfo,
         date: data.t ? new Date(data.t[count - 1] * 1000).toLocaleDateString('vi-VN') : undefined,
         source: 'Dữ liệu giao dịch sàn HOSE/HNX',
         news: newsItems

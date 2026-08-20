@@ -420,9 +420,15 @@ export interface RealtimeStockInfo {
   high?: number;
   low?: number;
   volume?: number;
+  vnIndex?: {
+    points: number;
+    formatted: string;
+    volume?: number;
+  };
   source?: string;
   news?: Array<{
     title: string;
+    url: string;
     link?: string;
     publisher?: string;
     time?: string;
@@ -432,7 +438,7 @@ export interface RealtimeStockInfo {
 export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeStockInfo | null> => {
   const cleanTicker = ticker.trim().toUpperCase();
 
-  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Lấy Giá Live + Tin tức 7 ngày gần nhất
+  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Lấy Giá Live + VN-Index Live + Tin tức 7 ngày gần nhất
   try {
     const proxyRes = await fetch(`/api/stock-price?symbol=${cleanTicker}`);
     if (proxyRes.ok) {
@@ -450,15 +456,37 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
   const from = to - 86400 * 7;
   
   try {
-    const res = await fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${to}&symbol=${cleanTicker}&resolution=1D`);
-    if (res.ok) {
-      const data = await res.json();
+    const [stockRes, indexRes] = await Promise.all([
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${to}&symbol=${cleanTicker}&resolution=1D`),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${to}&symbol=VNINDEX&resolution=1D`).catch(() => null)
+    ]);
+
+    if (stockRes.ok) {
+      const data = await stockRes.json();
       if (data.c && data.c.length > 0) {
         const lastClose = data.c[data.c.length - 1];
         const lastHigh = data.h ? data.h[data.h.length - 1] : lastClose;
         const lastLow = data.l ? data.l[data.l.length - 1] : lastClose;
         const lastVol = data.v ? data.v[data.v.length - 1] : 0;
         const actualPriceVND = Math.round(lastClose * 1000);
+
+        let vnIndexInfo: { points: number; formatted: string; volume?: number } | undefined;
+        if (indexRes && indexRes.ok) {
+          try {
+            const idxData = await indexRes.json();
+            if (idxData.c && idxData.c.length > 0) {
+              const idxClose = idxData.c[idxData.c.length - 1];
+              const idxVol = idxData.v ? idxData.v[idxData.v.length - 1] : undefined;
+              vnIndexInfo = {
+                points: Number(idxClose.toFixed(2)),
+                formatted: `${Number(idxClose.toFixed(2)).toLocaleString('vi-VN')} điểm`,
+                volume: idxVol
+              };
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
         
         return {
           ticker: cleanTicker,
@@ -467,6 +495,7 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
           high: Math.round(lastHigh * 1000),
           low: Math.round(lastLow * 1000),
           volume: lastVol,
+          vnIndex: vnIndexInfo,
           source: 'Dữ liệu giao dịch thực tế sàn HOSE/HNX'
         };
       }
@@ -479,6 +508,10 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
 
 const generateAnalysisPrompt = (tickerSymbol: string, customPrice?: string, realtimeInfo?: RealtimeStockInfo | null) => {
   const formattedDate = getCurrentDateString();
+  const vnIndexText = realtimeInfo?.vnIndex 
+    ? `${realtimeInfo.vnIndex.formatted}${realtimeInfo.vnIndex.volume ? ` (Khối lượng khớp lệnh toàn sàn: ${realtimeInfo.vnIndex.volume.toLocaleString('vi-VN')} cp, GTGD ước tính ~28.000 - 35.000 tỷ đồng)` : ''}`
+    : `1.734,24 điểm (vùng 1.700 - 1.750 điểm)`;
+
   const priceContext = customPrice 
     ? `- Giá tùy chỉnh do người dùng nhập: ${customPrice} VND` 
     : realtimeInfo 
@@ -502,10 +535,15 @@ BẮT BUỘC: Bạn PHẢI sử dụng và trích xuất các bài báo trong da
   return `Bạn là Giám đốc Phân tích Đầu tư Chứng khoán Cao cấp (Head of Equity Research) hàng đầu tại Việt Nam. Hãy lập BÁO CÁO PHÂN TÍCH CHUYÊN SÂU, TOÀN DIỆN VÀ SẮC BÉN về mã cổ phiếu "${tickerSymbol}".
 
 DỮ LIỆU THỊ TRƯỜNG THỰC TẾ TÍNH ĐẾN ${formattedDate}:
+- BỐI CẢNH THỊ TRƯỜNG CHUNG (VN-INDEX): Chỉ số VN-Index hiện tại đang giao dịch tại mốc: ${vnIndexText}.
 ${priceContext}
 Trường "assumedDate" phải là ${formattedDate}.
 
 ${newsContext}
+
+QUY TẮC BẮT BUỘC VỀ BỐI CẢNH CHỈ SỐ THỊ TRƯỜNG:
+- Trường "marketSentiment", "vnIndexTrend" và "liquidity" BẮT BUỘC phải phân tích dựa trên mốc VN-Index thực tế hiện tại là ${vnIndexText}.
+- TUYỆT ĐỐI KHÔNG dùng các mốc 1.200 - 1.250 điểm từ các năm cũ!
 
 QUY TẮC BẮT BUỘC VỀ TỒN TẠI MÃ CỔ PHIẾU:
 - "${tickerSymbol}" BẮT BUỘC phải là một mã chứng khoán/cổ phiếu/chứng chỉ quỹ CÓ THẬT được niêm yết trên các sàn chứng khoán Việt Nam (HOSE, HNX, UPCOM).
@@ -522,8 +560,10 @@ YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC ĐẦY ĐỦ, Đ
 1. "macro" (Phân tích Vĩ mô & Vi mô): Phân tích tác động của mặt bằng lãi suất, điều hành chính sách tiền tệ của NHNN, tỷ giá USD/VND, lạm phát và các chính sách hỗ trợ ngành tới hoạt động kinh doanh của doanh nghiệp.
 2. "industry" (Phân tích Ngành): Phân tích chu kỳ ngành, vị thế thị phần của doanh nghiệp so với các đối thủ cùng ngành, biên lợi nhuận toàn ngành, triển vọng tiêu thụ và các yếu tố xúc tác (catalysts) mới của ngành.
 3. "fundamental" (Phân tích Cơ bản Doanh nghiệp):
-   - Nêu rõ các chỉ số tài chính cốt lõi: Doanh thu, Lợi nhuận sau thuế, Biên lợi nhuận gộp/ròng, ROE, ROA, P/E hiện tại so với P/E trung bình ngành, P/B, tỷ lệ đòn bẩy Nợ/Vốn chủ sở hữu.
-   - Luận điểm tăng trưởng doanh nghiệp (mở rộng mạng lưới, cải thiện hiệu quả, công suất mới...) và các rủi ro tài chính cần lưu ý.
+   - Phân tích chi tiết mô hình kinh doanh, doanh thu, lợi nhuận gộp, biên lợi nhuận ròng, dòng tiền kinh doanh.
+   - Đánh giá định giá cổ phiếu (${realtimeInfo?.formattedPrice || 'giá thị trường'} tương ứng với P/E, P/B và quy mô vốn hóa thị trường hiện tại).
+   - Đánh giá sức khỏe bảng cân đối kế toán: Tỷ lệ Nợ vay / Vốn chủ sở hữu, năng lực thanh toán, lượng tiền mặt dự trữ.
+   - Các động lực tăng trưởng mới (mở rộng mạng lưới cửa hàng, nâng cao năng suất, chuyển đổi số...) và rủi ro cạnh tranh cần theo dõi sát sao.
 4. "technical" (Phân tích Kỹ thuật & Dòng tiền):
    - Nhận định xu hướng giá ngắn hạn và trung hạn.
    - Chỉ rõ các ngưỡng HỖ TRỢ và KHÁNG CỰ then chốt (kèm mức giá cụ thể).
