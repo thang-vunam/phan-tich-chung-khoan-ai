@@ -421,6 +421,21 @@ export interface RealtimeStockInfo {
 
 export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeStockInfo | null> => {
   const cleanTicker = ticker.trim().toUpperCase();
+
+  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Triệt tiêu 100% rào cản CORS trên trình duyệt
+  try {
+    const proxyRes = await fetch(`/api/stock-price?symbol=${cleanTicker}`);
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      if (data.price) {
+        return data;
+      }
+    }
+  } catch (err) {
+    // Chuyển sang fallback nếu chạy môi trường local dev server
+  }
+
+  // 2. Direct fetch fallback
   const to = Math.floor(Date.now() / 1000);
   const from = to - 86400 * 7;
   
