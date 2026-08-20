@@ -542,6 +542,7 @@ const sendChatWithToolFallback = async (
       config: {
         temperature: 0.1,
         maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
         tools: [{ googleSearch: {} }],
         systemInstruction,
       },
@@ -567,6 +568,7 @@ const sendChatWithToolFallback = async (
         config: {
           temperature: 0.1,
           maxOutputTokens: 8192,
+          responseMimeType: 'application/json',
           systemInstruction,
         },
       });
