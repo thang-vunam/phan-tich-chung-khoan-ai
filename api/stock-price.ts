@@ -8,13 +8,15 @@ export interface StockNewsItem {
 
 async function fetchLatestStockNews(symbol: string): Promise<StockNewsItem[]> {
   try {
-    const q1 = encodeURIComponent(`${symbol} (chứng khoán OR cổ phiếu) when:7d`);
-    const q2 = encodeURIComponent(`${symbol} ("kết quả kinh doanh" OR "lợi nhuận" OR "doanh thu" OR "báo cáo tài chính" OR "quý")`);
+    const q1 = encodeURIComponent(`"${symbol}" (chứng khoán OR cổ phiếu) when:7d`);
+    const q2 = encodeURIComponent(`"${symbol}" ("kết quả kinh doanh" OR "lợi nhuận" OR "doanh thu" OR "báo cáo tài chính" OR "quý")`);
 
     const [res1, res2] = await Promise.all([
       fetch(`https://news.google.com/rss/search?q=${q1}&hl=vi&gl=VN&ceid=VN:vi`).catch(() => null),
       fetch(`https://news.google.com/rss/search?q=${q2}&hl=vi&gl=VN&ceid=VN:vi`).catch(() => null)
     ]);
+
+    const tickerRegex = new RegExp(`\\b${symbol}\\b`, 'i');
 
     const parseXml = async (res: any) => {
       if (!res || !res.ok) return [];
@@ -25,6 +27,12 @@ async function fetchLatestStockNews(symbol: string): Promise<StockNewsItem[]> {
       let match;
       while ((match = itemRegex.exec(xml)) !== null && items.length < 5) {
         let rawTitle = (match[1] || '').replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+        
+        // BẮT BUỘC: Tiêu đề bài báo phải chứa chính xác mã cổ phiếu ${symbol}
+        if (!tickerRegex.test(rawTitle)) {
+          continue;
+        }
+
         const link = (match[2] || '').trim();
         const rawDate = (match[3] || '').trim();
         let source = (match[4] || '').replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
