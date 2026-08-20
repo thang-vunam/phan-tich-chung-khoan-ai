@@ -2,7 +2,7 @@
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import type { AnalysisResult, ComparisonResult, GroundingSource, MarketSentiment, IndustryAnalysisResult, NewsItem } from '../types';
 
-const PRO_MODEL = 'gemini-2.5-flash';
+const PRO_MODEL = 'gemini-3.6-flash';
 
 const extractGroundingSources = (response: GenerateContentResponse): GroundingSource[] => {
     const sources: GroundingSource[] = [];
