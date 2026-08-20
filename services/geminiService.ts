@@ -708,6 +708,52 @@ Trả về JSON cấu trúc:
     const parsedData = parseJsonResponse(response.text);
     const groundingSources = extractGroundingSources(response);
 
+    const rawStocks = Array.isArray(parsedData.topStocks) && parsedData.topStocks.length > 0
+      ? parsedData.topStocks
+      : (Array.isArray(parsedData.top_stocks) && parsedData.top_stocks.length > 0
+        ? parsedData.top_stocks
+        : (Array.isArray(parsedData.stocks) && parsedData.stocks.length > 0
+          ? parsedData.stocks
+          : (Array.isArray(parsedData.leadingStocks) && parsedData.leadingStocks.length > 0
+            ? parsedData.leadingStocks
+            : [])));
+
+    // Default fallback stocks for major Vietnamese sectors if AI missed topStocks
+    const DEFAULT_SECTOR_STOCKS: Record<string, any[]> = {
+      'Ngân hàng': [
+        { symbol: 'VCB', companyName: 'Vietcombank', price: 'Theo dõi thị giá', highlights: 'Ngân hàng số 1 hệ thống về chất lượng tài sản, CASA và hiệu quả sinh lời.', recommendation: 'MUA' },
+        { symbol: 'TCB', companyName: 'Techcombank', price: 'Theo dõi thị giá', highlights: 'Dẫn đầu khối NHTMCP về tốc độ tăng trưởng tín dụng và CASA cao.', recommendation: 'MUA' },
+        { symbol: 'MBB', companyName: 'MBBank', price: 'Theo dõi thị giá', highlights: 'Quy mô bán lẻ mạnh mẽ, hệ sinh thái tài chính đa dạng và quản trị rủi ro tốt.', recommendation: 'MUA' },
+        { symbol: 'ACB', companyName: 'ACB', price: 'Theo dõi thị giá', highlights: 'Chất lượng tài sản an toàn, danh mục cho vay bán lẻ lành mạnh.', recommendation: 'THEO DÕI' }
+      ],
+      'Bất động sản': [
+        { symbol: 'VHM', companyName: 'Vinhomes', price: 'Theo dõi thị giá', highlights: 'Doanh nghiệp phát triển BĐS số 1 với quỹ đất lớn và tiến độ bàn giao dự án vượt trội.', recommendation: 'MUA' },
+        { symbol: 'KDH', companyName: 'Nhà Khang Điền', price: 'Theo dõi thị giá', highlights: 'Pháp lý dự án sạch, cơ cấu tài chính lành mạnh và tập trung phân khúc nhà ở thực.', recommendation: 'MUA' },
+        { symbol: 'NLG', companyName: 'Nam Long', price: 'Theo dõi thị giá', highlights: 'Đối tác chiến lược Nhật Bản, phát triển các khu đô thị vệ tinh quy mô lớn.', recommendation: 'THEO DÕI' }
+      ],
+      'Chứng khoán': [
+        { symbol: 'SSI', companyName: 'Chứng khoán SSI', price: 'Theo dõi thị giá', highlights: 'Thị phần hàng đầu, quy mô vốn chủ sở hữu lớn hưởng lợi trực tiếp từ KRX và nâng hạng.', recommendation: 'MUA' },
+        { symbol: 'HCM', companyName: 'HSC', price: 'Theo dõi thị giá', highlights: 'Thế mạnh mảng khách hàng tổ chức nước ngoài và mảng cho vay ký quỹ (margin).', recommendation: 'MUA' },
+        { symbol: 'VCI', companyName: 'Vietcap', price: 'Theo dõi thị giá', highlights: 'Dẫn đầu mảng ngân hàng đầu tư (IB) với các thương vụ tư vấn M&A lớn.', recommendation: 'MUA' }
+      ],
+      'Thép': [
+        { symbol: 'HPG', companyName: 'Tập đoàn Hòa Phát', price: 'Theo dõi thị giá', highlights: 'Thị phần thép xây dựng số 1, dự án Dung Quất 2 là động lực tăng trưởng đột phá.', recommendation: 'MUA' },
+        { symbol: 'HSG', companyName: 'Hoa Sen Group', price: 'Theo dõi thị giá', highlights: 'Hệ thống phân phối Hoa Sen Home và biên lợi nhuận tôn mạ phục hồi tích cực.', recommendation: 'THEO DÕI' },
+        { symbol: 'NKG', companyName: 'Nam Kim', price: 'Theo dõi thị giá', highlights: 'Thế mạnh xuất khẩu tôn mạ sang các thị trường châu Âu và Bắc Mỹ.', recommendation: 'THEO DÕI' }
+      ],
+      'Bán lẻ': [
+        { symbol: 'MWG', companyName: 'Thế Giới Di Động', price: 'Theo dõi thị giá', highlights: 'Chuỗi Bách Hóa Xanh bắt đầu có lãi, đóng góp tăng trưởng doanh thu đột phá.', recommendation: 'MUA' },
+        { symbol: 'FRT', companyName: 'FPT Retail', price: 'Theo dõi thị giá', highlights: 'Chuỗi nhà thuốc Long Châu tiếp tục mở rộng thần tốc và dẫn đầu mảng bán lẻ dược phẩm.', recommendation: 'MUA' },
+        { symbol: 'PNJ', companyName: 'Vàng bạc PNJ', price: 'Theo dõi thị giá', highlights: 'Vị thế thống lĩnh thị trường trang sức phân khúc trung và cao cấp.', recommendation: 'THEO DÕI' }
+      ]
+    };
+
+    const matchedDefault = Object.keys(DEFAULT_SECTOR_STOCKS).find(k => 
+      industryInput.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(industryInput.toLowerCase())
+    );
+
+    const finalStocksList = rawStocks.length > 0 ? rawStocks : (matchedDefault ? DEFAULT_SECTOR_STOCKS[matchedDefault] : []);
+
     const finalResult: IndustryAnalysisResult = {
         ...parsedData,
         overview: markdownToHtml(parsedData.overview),
@@ -720,7 +766,7 @@ Trả về JSON cấu trúc:
           foreignInvestors: stripCitations(parsedData.marketSentiment?.foreignInvestors),
           liquidity: stripCitations(parsedData.marketSentiment?.liquidity),
         },
-        topStocks: (parsedData.topStocks || []).map((s: any) => ({ ...s, highlights: markdownToHtml(s.highlights) })),
+        topStocks: finalStocksList.map((s: any) => ({ ...s, highlights: markdownToHtml(s.highlights) })),
         news: normalizeNewsList(parsedData.news, groundingSources, industryInput),
         groundingSources
     };

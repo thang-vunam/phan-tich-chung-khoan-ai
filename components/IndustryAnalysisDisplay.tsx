@@ -161,17 +161,19 @@ export const IndustryAnalysisDisplay: React.FC<IndustryAnalysisDisplayProps> = (
          </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 mb-2">
-            <LightBulbIcon className="w-8 h-8 text-yellow-400" />
-            <h3 className="text-2xl font-bold text-gray-100">Cổ phiếu Nổi bật</h3>
+      {Array.isArray(analysis.topStocks) && analysis.topStocks.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+              <LightBulbIcon className="w-8 h-8 text-yellow-400" />
+              <h3 className="text-2xl font-bold text-gray-100">Cổ phiếu Nổi bật</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {analysis.topStocks.map((stock) => (
+                  <StockCard key={stock.symbol} stock={stock} onSelect={onSelectTicker} />
+              ))}
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {analysis.topStocks.map((stock) => (
-                <StockCard key={stock.symbol} stock={stock} onSelect={onSelectTicker} />
-            ))}
-        </div>
-      </div>
+      )}
 
       <Section title="Tổng quan Ngành" icon={<GlobeAltIcon className="w-6 h-6 text-blue-400" />} content={analysis.overview} />
       
