@@ -409,11 +409,68 @@ const getCurrentDateString = () => {
   return `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
 };
 
-const generateAnalysisPrompt = (tickerSymbol: string, customPrice?: string) => {
+export interface RealtimeStockInfo {
+  ticker: string;
+  price?: number;
+  formattedPrice?: string;
+  high?: number;
+  low?: number;
+  volume?: number;
+  source?: string;
+}
+
+export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeStockInfo | null> => {
+  const cleanTicker = ticker.trim().toUpperCase();
+  const to = Math.floor(Date.now() / 1000);
+  const from = to - 86400 * 7;
+  
+  try {
+    const res = await fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${to}&symbol=${cleanTicker}&resolution=1D`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.c && data.c.length > 0) {
+        const lastClose = data.c[data.c.length - 1];
+        const lastHigh = data.h ? data.h[data.h.length - 1] : lastClose;
+        const lastLow = data.l ? data.l[data.l.length - 1] : lastClose;
+        const lastVol = data.v ? data.v[data.v.length - 1] : 0;
+        const actualPriceVND = Math.round(lastClose * 1000);
+        
+        return {
+          ticker: cleanTicker,
+          price: actualPriceVND,
+          formattedPrice: `${actualPriceVND.toLocaleString('vi-VN')} VND`,
+          high: Math.round(lastHigh * 1000),
+          low: Math.round(lastLow * 1000),
+          volume: lastVol,
+          source: 'Dữ liệu giao dịch thực tế sàn HOSE/HNX'
+        };
+      }
+    }
+  } catch (err) {
+    console.warn(`Could not fetch realtime price for ${cleanTicker}:`, err);
+  }
+  return null;
+};
+
+const generateAnalysisPrompt = (tickerSymbol: string, customPrice?: string, realtimeInfo?: RealtimeStockInfo | null) => {
   const formattedDate = getCurrentDateString();
+  const priceContext = customPrice 
+    ? `- Giá tùy chỉnh do người dùng nhập: ${customPrice} VND` 
+    : realtimeInfo 
+      ? `- Giá đóng cửa thực tế mới nhất: ${realtimeInfo.formattedPrice} (${realtimeInfo.price?.toLocaleString('vi-VN')} VND)
+- Khối lượng giao dịch: ${realtimeInfo.volume?.toLocaleString('vi-VN')} cp
+- Biên độ phiên gần nhất: ${realtimeInfo.low?.toLocaleString('vi-VN')} VND - ${realtimeInfo.high?.toLocaleString('vi-VN')} VND`
+      : `- Giá thị trường mới nhất tính đến ${formattedDate}`;
+
+  const targetPriceRule = customPrice
+    ? `Dựa trên mức giá ${customPrice} VND`
+    : realtimeInfo
+      ? `BẮT BUỘC TÍNH TOÁN DỰA TRÊN MỨC GIÁ THỰC TẾ ${realtimeInfo.formattedPrice} (tuyệt đối KHÔNG dùng các mốc giá lịch sử cũ)`
+      : `Dựa trên định giá thị trường thực tế`;
+
   return `Bạn là chuyên gia phân tích chứng khoán VN. Phân tích súc tích mã cổ phiếu "${tickerSymbol}".
-Dữ liệu: ${customPrice ? `Giá ${customPrice} VND` : 'Giá thị trường mới nhất'} tính đến ${formattedDate}.
-Sử dụng Google Search để lấy dữ liệu giá thực tế và tin tức mới nhất.
+DỮ LIỆU THỊ TRƯỜNG THỰC TẾ TÍNH ĐẾN ${formattedDate}:
+${priceContext}
 Trường "assumedDate" phải là ${formattedDate}.
 
 QUY TẮC BẮT BUỘC VỀ TỒN TẠI MÃ CỔ PHIẾU:
@@ -421,6 +478,10 @@ QUY TẮC BẮT BUỘC VỀ TỒN TẠI MÃ CỔ PHIẾU:
 - Nếu "${tickerSymbol}" KHÔNG PHẢI là mã chứng khoán có thật (ví dụ từ vô nghĩa, tên ngành, mã không niêm yết...), bạn PHẢI trả về JSON:
 {"isValid": false, "error": "Mã cổ phiếu '${tickerSymbol}' không tồn tại trên thị trường chứng khoán Việt Nam. Vui lòng kiểm tra lại."}
 TUYỆT ĐỐI KHÔNG tự bịa đặt thông tin hoặc phân tích sang mã khác!
+
+YÊU CẦU ĐỊNH GIÁ:
+- Trường "closingPrice" PHẢI LÀ "${customPrice ? `${customPrice} VND` : realtimeInfo ? realtimeInfo.formattedPrice : 'Giá thị trường'}".
+- Các mức giá mục tiêu trong "targetPrices" (shortTerm, midTerm, longTerm): ${targetPriceRule}.
 
 YÊU CẦU PHÂN TÍCH: Trình bày súc tích, gạch đầu dòng rõ ràng, đi thẳng vào các luận điểm và số liệu cốt lõi, tránh diễn giải dài dòng.
 YÊU CẦU TIN TỨC:
@@ -558,11 +619,13 @@ const sendChatWithToolFallback = async (
 };
 
 const fetchStockAnalysisInternal = async (tickerSymbol: string, customPrice?: string): Promise<{ result: AnalysisResult; chat: Chat }> => {
+  const realtimeInfo = await fetchRealtimeStockInfo(tickerSymbol);
+
   return await executeWithKeyFallback(async (ai) => {
     const systemInstruction = `Bạn là trợ lý phân tích chứng khoán chuyên nghiệp. Trả lời bằng tiếng Việt và BẮT BUỘC trả về đúng cấu trúc JSON trong khối \`\`\`json ... \`\`\`.`;
     const { response, chat } = await sendChatWithToolFallback(
       ai,
-      generateAnalysisPrompt(tickerSymbol, customPrice),
+      generateAnalysisPrompt(tickerSymbol, customPrice, realtimeInfo),
       systemInstruction
     );
 
@@ -574,6 +637,7 @@ const fetchStockAnalysisInternal = async (tickerSymbol: string, customPrice?: st
 
     const finalResult: AnalysisResult = {
       ...parsedData,
+      closingPrice: customPrice ? `${customPrice} VND` : (realtimeInfo?.formattedPrice || parsedData.closingPrice),
       macro: markdownToHtml(parsedData.macro),
       industry: markdownToHtml(parsedData.industry),
       fundamental: markdownToHtml(parsedData.fundamental),
@@ -597,11 +661,25 @@ const fetchStockAnalysisInternal = async (tickerSymbol: string, customPrice?: st
 };
 
 const fetchStockComparisonInternal = async (ticker1: string, ticker2: string): Promise<{ result: ComparisonResult, chat: Chat }> => {
+  const [realtime1, realtime2] = await Promise.all([
+    fetchRealtimeStockInfo(ticker1),
+    fetchRealtimeStockInfo(ticker2)
+  ]);
+
   return await executeWithKeyFallback(async (ai) => {
     const systemInstruction = `Bạn là chuyên gia so sánh đối đầu cổ phiếu chứng khoán Việt Nam hàng đầu. Trả lời bằng tiếng Việt và BẮT BUỘC trả về đúng cấu trúc JSON trong khối \`\`\`json ... \`\`\`.`;
     const formattedDate = getCurrentDateString();
     const prompt = `So sánh chuyên sâu và súc tích 2 cổ phiếu: "${ticker1}" và "${ticker2}" tính đến ngày ${formattedDate}.
+DỮ LIỆU THỊ TRƯỜNG THỰC TẾ HÔM NAY:
+- Mã ${ticker1}: Giá đóng cửa thực tế ${realtime1?.formattedPrice || 'Giá thị trường'}${realtime1?.volume ? ` (KL: ${realtime1.volume.toLocaleString('vi-VN')} cp, Biên độ: ${realtime1.low?.toLocaleString('vi-VN')} - ${realtime1.high?.toLocaleString('vi-VN')} VND)` : ''}.
+- Mã ${ticker2}: Giá đóng cửa thực tế ${realtime2?.formattedPrice || 'Giá thị trường'}${realtime2?.volume ? ` (KL: ${realtime2.volume.toLocaleString('vi-VN')} cp, Biên độ: ${realtime2.low?.toLocaleString('vi-VN')} - ${realtime2.high?.toLocaleString('vi-VN')} VND)` : ''}.
+
 Trình bày ngắn gọn, gạch đầu dòng rõ ràng.
+QUY TẮC BẮT BUỘC:
+1. Trường "closingPrice" của ${ticker1} PHẢI LÀ "${realtime1?.formattedPrice || 'Giá thị trường'}".
+2. Trường "closingPrice" của ${ticker2} PHẢI LÀ "${realtime2?.formattedPrice || 'Giá thị trường'}".
+3. Toàn bộ mức giá mục tiêu trong "targetPrices" của cả 2 mã BẮT BUỘC phải được tính toán dựa trên mức giá thực tế này.
+
 YÊU CẦU TIN TỨC: CHỈ lấy 5-7 tin tức TRỰC TIẾP đề cập đến "${ticker1}" hoặc "${ticker2}" trong 7 ngày gần đây. Nếu không tìm thấy, trả về "news": [].
 
 BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
@@ -609,7 +687,7 @@ BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
   "assumedDate": "${formattedDate}",
   "ticker1": {
     "symbol": "${ticker1}",
-    "closingPrice": "Giá đóng cửa kèm VND (ví dụ: 19.800 VND)",
+    "closingPrice": "${realtime1?.formattedPrice || 'Giá thị trường'}",
     "analysis": {
       "macro": "markdown phân tích vĩ mô tác động tới ${ticker1}",
       "industry": "markdown phân tích ngành và vị thế của ${ticker1}",
@@ -632,7 +710,7 @@ BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
   },
   "ticker2": {
     "symbol": "${ticker2}",
-    "closingPrice": "Giá đóng cửa kèm VND (ví dụ: 26.000 VND)",
+    "closingPrice": "${realtime2?.formattedPrice || 'Giá thị trường'}",
     "analysis": {
       "macro": "markdown phân tích vĩ mô tác động tới ${ticker2}",
       "industry": "markdown phân tích ngành và vị thế của ${ticker2}",
