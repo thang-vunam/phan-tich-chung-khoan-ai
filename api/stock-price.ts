@@ -74,10 +74,12 @@ export default async function handler(req: any, res: any) {
   const url = `https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${now}&symbol=${symbol}&resolution=1D`;
 
   try {
-    // Chạy song song: Lấy giá Live từ sàn + Chỉ số VN-Index thực tế + Tin tức 7 ngày gần nhất
-    const [apiRes, indexRes, newsItems] = await Promise.all([
+    // Chạy song song: Lấy giá Live từ sàn + Chỉ số cả 3 sàn (HOSE, HNX, UPCOM) + Tin tức 7 ngày gần nhất
+    const [apiRes, vnIndexRes, hnxRes, upcomRes, newsItems] = await Promise.all([
       fetch(url),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${now}&symbol=VNINDEX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${now}&symbol=HNX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${now}&symbol=UPCOM&resolution=1D`).catch(() => null),
       fetchLatestStockNews(symbol)
     ]);
 
@@ -85,23 +87,38 @@ export default async function handler(req: any, res: any) {
       return res.status(apiRes.status).json({ error: `DNSE API returned status ${apiRes.status}` });
     }
 
-    let vnIndexInfo: { points: number; formatted: string; volume?: number } | undefined;
-    if (indexRes && indexRes.ok) {
+    const parseIndex = (resObj: any) => {
+      if (!resObj || !resObj.ok) return undefined;
       try {
-        const indexData = await indexRes.json();
-        if (indexData.c && indexData.c.length > 0) {
-          const idxClose = indexData.c[indexData.c.length - 1];
-          const idxVol = indexData.v ? indexData.v[indexData.v.length - 1] : undefined;
-          vnIndexInfo = {
-            points: Number(idxClose.toFixed(2)),
-            formatted: `${Number(idxClose.toFixed(2)).toLocaleString('vi-VN')} điểm`,
-            volume: idxVol
-          };
-        }
+        return resObj.json();
       } catch (e) {
-        // ignore
+        return undefined;
       }
-    }
+    };
+
+    const [vnData, hnxData, upcomData] = await Promise.all([
+      parseIndex(vnIndexRes),
+      parseIndex(hnxRes),
+      parseIndex(upcomRes)
+    ]);
+
+    const getIndexInfo = (data: any, name: string) => {
+      if (data && data.c && data.c.length > 0) {
+        const idxClose = data.c[data.c.length - 1];
+        const idxVol = data.v ? data.v[data.v.length - 1] : undefined;
+        return {
+          name,
+          points: Number(idxClose.toFixed(2)),
+          formatted: `${Number(idxClose.toFixed(2)).toLocaleString('vi-VN')} điểm`,
+          volume: idxVol
+        };
+      }
+      return undefined;
+    };
+
+    const vnIndexInfo = getIndexInfo(vnData, 'VN-INDEX');
+    const hnxInfo = getIndexInfo(hnxData, 'HNX-INDEX');
+    const upcomInfo = getIndexInfo(upcomData, 'UPCOM-INDEX');
 
     const data = await apiRes.json();
     if (data.c && data.c.length > 0) {
@@ -120,8 +137,10 @@ export default async function handler(req: any, res: any) {
         low: Math.round(lastLow * 1000),
         volume: lastVol,
         vnIndex: vnIndexInfo,
+        hnxIndex: hnxInfo,
+        upcomIndex: upcomInfo,
         date: data.t ? new Date(data.t[count - 1] * 1000).toLocaleDateString('vi-VN') : undefined,
-        source: 'Dữ liệu giao dịch sàn HOSE/HNX',
+        source: 'Dữ liệu giao dịch sàn HOSE/HNX/UPCOM',
         news: newsItems
       });
     }

@@ -425,6 +425,16 @@ export interface RealtimeStockInfo {
     formatted: string;
     volume?: number;
   };
+  hnxIndex?: {
+    points: number;
+    formatted: string;
+    volume?: number;
+  };
+  upcomIndex?: {
+    points: number;
+    formatted: string;
+    volume?: number;
+  };
   source?: string;
   news?: Array<{
     title: string;
@@ -438,7 +448,7 @@ export interface RealtimeStockInfo {
 export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeStockInfo | null> => {
   const cleanTicker = ticker.trim().toUpperCase();
 
-  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Lấy Giá Live + VN-Index Live + Tin tức 7 ngày gần nhất
+  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Lấy Giá Live + Chỉ số 3 sàn (HOSE, HNX, UPCOM) + Tin tức 7 ngày gần nhất
   try {
     const proxyRes = await fetch(`/api/stock-price?symbol=${cleanTicker}`);
     if (proxyRes.ok) {
@@ -456,9 +466,11 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
   const from = to - 86400 * 7;
   
   try {
-    const [stockRes, indexRes] = await Promise.all([
+    const [stockRes, indexRes, hnxRes, upcomRes] = await Promise.all([
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${to}&symbol=${cleanTicker}&resolution=1D`),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${to}&symbol=VNINDEX&resolution=1D`).catch(() => null)
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${to}&symbol=VNINDEX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${to}&symbol=HNX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${to}&symbol=UPCOM&resolution=1D`).catch(() => null)
     ]);
 
     if (stockRes.ok) {
@@ -470,23 +482,23 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
         const lastVol = data.v ? data.v[data.v.length - 1] : 0;
         const actualPriceVND = Math.round(lastClose * 1000);
 
-        let vnIndexInfo: { points: number; formatted: string; volume?: number } | undefined;
-        if (indexRes && indexRes.ok) {
+        const getIdx = async (res: any) => {
+          if (!res || !res.ok) return undefined;
           try {
-            const idxData = await indexRes.json();
-            if (idxData.c && idxData.c.length > 0) {
-              const idxClose = idxData.c[idxData.c.length - 1];
-              const idxVol = idxData.v ? idxData.v[idxData.v.length - 1] : undefined;
-              vnIndexInfo = {
-                points: Number(idxClose.toFixed(2)),
-                formatted: `${Number(idxClose.toFixed(2)).toLocaleString('vi-VN')} điểm`,
-                volume: idxVol
-              };
+            const d = await res.json();
+            if (d.c && d.c.length > 0) {
+              const pts = Number(d.c[d.c.length - 1].toFixed(2));
+              return { points: pts, formatted: `${pts.toLocaleString('vi-VN')} điểm`, volume: d.v?.slice(-1)[0] };
             }
-          } catch (e) {
-            // ignore
-          }
-        }
+          } catch (e) {}
+          return undefined;
+        };
+
+        const [vnIndexInfo, hnxInfo, upcomInfo] = await Promise.all([
+          getIdx(indexRes),
+          getIdx(hnxRes),
+          getIdx(upcomRes)
+        ]);
         
         return {
           ticker: cleanTicker,
@@ -496,7 +508,9 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
           low: Math.round(lastLow * 1000),
           volume: lastVol,
           vnIndex: vnIndexInfo,
-          source: 'Dữ liệu giao dịch thực tế sàn HOSE/HNX'
+          hnxIndex: hnxInfo,
+          upcomIndex: upcomInfo,
+          source: 'Dữ liệu giao dịch thực tế sàn HOSE/HNX/UPCOM'
         };
       }
     }
@@ -509,8 +523,11 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
 const generateAnalysisPrompt = (tickerSymbol: string, customPrice?: string, realtimeInfo?: RealtimeStockInfo | null) => {
   const formattedDate = getCurrentDateString();
   const vnIndexText = realtimeInfo?.vnIndex 
-    ? `${realtimeInfo.vnIndex.formatted}${realtimeInfo.vnIndex.volume ? ` (Khối lượng khớp lệnh toàn sàn: ${realtimeInfo.vnIndex.volume.toLocaleString('vi-VN')} cp, GTGD ước tính ~28.000 - 35.000 tỷ đồng)` : ''}`
+    ? `${realtimeInfo.vnIndex.formatted}${realtimeInfo.vnIndex.volume ? ` (Khối lượng HOSE: ${realtimeInfo.vnIndex.volume.toLocaleString('vi-VN')} cp)` : ''}`
     : `1.734,24 điểm (vùng 1.700 - 1.750 điểm)`;
+
+  const hnxText = realtimeInfo?.hnxIndex ? realtimeInfo.hnxIndex.formatted : '278,55 điểm';
+  const upcomText = realtimeInfo?.upcomIndex ? realtimeInfo.upcomIndex.formatted : '127,24 điểm';
 
   const priceContext = customPrice 
     ? `- Giá tùy chỉnh do người dùng nhập: ${customPrice} VND` 
@@ -535,14 +552,18 @@ BẮT BUỘC: Bạn PHẢI sử dụng và trích xuất các bài báo trong da
   return `Bạn là Giám đốc Phân tích Đầu tư Chứng khoán Cao cấp (Head of Equity Research) hàng đầu tại Việt Nam. Hãy lập BÁO CÁO PHÂN TÍCH CHUYÊN SÂU, TOÀN DIỆN VÀ SẮC BÉN về mã cổ phiếu "${tickerSymbol}".
 
 DỮ LIỆU THỊ TRƯỜNG THỰC TẾ TÍNH ĐẾN ${formattedDate}:
-- BỐI CẢNH THỊ TRƯỜNG CHUNG (VN-INDEX): Chỉ số VN-Index hiện tại đang giao dịch tại mốc: ${vnIndexText}.
+- BỐI CẢNH CHỈ SỐ CÁC SÀN THỰC TẾ HÔM NAY:
+  * Sàn HOSE (VN-INDEX): ${vnIndexText}
+  * Sàn HNX (HNX-INDEX): ${hnxText}
+  * Sàn UPCOM (UPCOM-INDEX): ${upcomText}
 ${priceContext}
 Trường "assumedDate" phải là ${formattedDate}.
 
 ${newsContext}
 
 QUY TẮC BẮT BUỘC VỀ BỐI CẢNH CHỈ SỐ THỊ TRƯỜNG:
-- Trường "marketSentiment", "vnIndexTrend" và "liquidity" BẮT BUỘC phải phân tích dựa trên mốc VN-Index thực tế hiện tại là ${vnIndexText}.
+- Xác định sàn niêm yết của "${tickerSymbol}" (HOSE, HNX hay UPCOM) để phân tích tương ứng.
+- Trường "marketSentiment", "vnIndexTrend" và "liquidity" BẮT BUỘC phải phân tích dựa trên mốc VN-Index thực tế hiện tại là ${vnIndexText} (hoặc HNX-Index ${hnxText} nếu là sàn HNX).
 - TUYỆT ĐỐI KHÔNG dùng các mốc 1.200 - 1.250 điểm từ các năm cũ!
 
 QUY TẮC BẮT BUỘC VỀ TỒN TẠI MÃ CỔ PHIẾU:
