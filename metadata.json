@@ -1,0 +1,5 @@
+{
+  "name": "Phân tích đầu tư Chứng khoán by thangvu",
+  "description": "An application that provides a top-down funnel analysis for Vietnamese stock tickers or indices using AI, covering macroeconomic, industry, fundamental, and technical aspects to generate an investment recommendation.",
+  "requestFramePermissions": []
+}
