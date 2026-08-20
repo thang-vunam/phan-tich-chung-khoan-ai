@@ -150,6 +150,7 @@ export function markdownToHtml(rawInput: any): string {
     let inList: 'ul' | 'ol' | null = null;
     let inTable = false;
     let tableLines: string[] = [];
+    let sectionCounter = 0;
 
     const closeList = () => {
         if (inList === 'ul') {
@@ -184,7 +185,6 @@ export function markdownToHtml(rawInput: any): string {
             continue;
         }
 
-        // Table check
         if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
             closeList();
             inTable = true;
@@ -194,7 +194,15 @@ export function markdownToHtml(rawInput: any): string {
             flushTable();
         }
 
-        // Unordered list item: * or -
+        const numberedHeaderMatch = trimmed.match(/^(\d+)[\.\)]\s+(.+)$/);
+        if (numberedHeaderMatch) {
+            closeList();
+            sectionCounter++;
+            const titleContent = numberedHeaderMatch[2];
+            outputHtml.push(`<h4 class="text-base font-bold text-cyan-300 mt-4 mb-2 flex items-start gap-1.5"><span class="text-cyan-400 font-bold flex-shrink-0">${sectionCounter}.</span> <span>${styleInline(titleContent)}</span></h4>`);
+            continue;
+        }
+
         const ulMatch = trimmed.match(/^[\*-]\s+(.+)$/);
         if (ulMatch) {
             if (inList !== 'ul') {
@@ -206,19 +214,6 @@ export function markdownToHtml(rawInput: any): string {
             continue;
         }
 
-        // Ordered list item: 1. or 2.
-        const olMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
-        if (olMatch) {
-            if (inList !== 'ol') {
-                closeList();
-                outputHtml.push('<ol class="list-decimal pl-5 space-y-2 my-2.5 text-gray-300">');
-                inList = 'ol';
-            }
-            outputHtml.push(`<li class="leading-relaxed">${styleInline(olMatch[2])}</li>`);
-            continue;
-        }
-
-        // Regular paragraph or heading
         closeList();
 
         if (trimmed.startsWith('### ')) {
