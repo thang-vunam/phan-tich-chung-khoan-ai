@@ -417,12 +417,18 @@ export interface RealtimeStockInfo {
   low?: number;
   volume?: number;
   source?: string;
+  news?: Array<{
+    title: string;
+    link?: string;
+    publisher?: string;
+    time?: string;
+  }>;
 }
 
 export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeStockInfo | null> => {
   const cleanTicker = ticker.trim().toUpperCase();
 
-  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Triệt tiêu 100% rào cản CORS trên trình duyệt
+  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Lấy Giá Live + Tin tức 7 ngày gần nhất
   try {
     const proxyRes = await fetch(`/api/stock-price?symbol=${cleanTicker}`);
     if (proxyRes.ok) {
@@ -483,10 +489,18 @@ const generateAnalysisPrompt = (tickerSymbol: string, customPrice?: string, real
       ? `BẮT BUỘC TÍNH TOÁN DỰA TRÊN MỨC GIÁ THỰC TẾ ${realtimeInfo.formattedPrice} (tuyệt đối KHÔNG dùng các mốc giá lịch sử cũ)`
       : `Dựa trên định giá thị trường thực tế`;
 
+  const newsContext = (realtimeInfo?.news && realtimeInfo.news.length > 0)
+    ? `DANH SÁCH BÀI BÁO THỰC TẾ TRONG 7 NGÀY GẦN NHẤT:
+${realtimeInfo.news.map((n, i) => `${i + 1}. "${n.title}" (Nguồn: ${n.publisher}, Thời gian: ${n.time})`).join('\n')}
+BẮT BUỘC: Bạn PHẢI sử dụng và trích xuất các bài báo trong danh sách thực tế trên để điền vào trường "news". Tuyệt đối KHÔNG tự bịa đặt tin tức từ các năm trước.`
+    : `YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP trong 7 ngày gần đây. Nếu không có tin trong 7 ngày, trả về "news": [].`;
+
   return `Bạn là chuyên gia phân tích chứng khoán VN. Phân tích súc tích mã cổ phiếu "${tickerSymbol}".
 DỮ LIỆU THỊ TRƯỜNG THỰC TẾ TÍNH ĐẾN ${formattedDate}:
 ${priceContext}
 Trường "assumedDate" phải là ${formattedDate}.
+
+${newsContext}
 
 QUY TẮC BẮT BUỘC VỀ TỒN TẠI MÃ CỔ PHIẾU:
 - "${tickerSymbol}" BẮT BUỘC phải là một mã chứng khoán/cổ phiếu/chứng chỉ quỹ CÓ THẬT được niêm yết trên các sàn chứng khoán Việt Nam (HOSE, HNX, UPCOM).
@@ -499,9 +513,6 @@ YÊU CẦU ĐỊNH GIÁ:
 - Các mức giá mục tiêu trong "targetPrices" (shortTerm, midTerm, longTerm): ${targetPriceRule}.
 
 YÊU CẦU PHÂN TÍCH: Trình bày súc tích, gạch đầu dòng rõ ràng, đi thẳng vào các luận điểm và số liệu cốt lõi, tránh diễn giải dài dòng.
-YÊU CẦU TIN TỨC:
-- CHỈ lấy tin tức TRỰC TIẾP đề cập đến mã cổ phiếu "${tickerSymbol}" hoặc công ty sở hữu mã "${tickerSymbol}" trong 7 ngày gần đây. Nếu không có tin trong 7 ngày, trả về "news": [].
-- Cung cấp: "title", "publisher" (CafeF, Vietstock...), "time" ("2 ngày trước").
 Trả về JSON cấu trúc:
 {
   "isValid": true,
@@ -517,7 +528,7 @@ Trả về JSON cấu trúc:
     "longTerm": { "value": number, "label": "string" } 
   },
   "news": [
-    { "title": "Tiêu đề tin trực tiếp về ${tickerSymbol}", "publisher": "Vietstock", "time": "2 ngày trước" }
+    { "title": "Tiêu đề tin tức thực tế", "publisher": "Vietstock", "time": "2 ngày trước" }
   ]
 }
 Ghi chú: "targetPrices" phải có "value" là số nguyên và "label" là chuỗi mô tả kèm lý do súc tích.`;
@@ -667,7 +678,9 @@ const fetchStockAnalysisInternal = async (tickerSymbol: string, customPrice?: st
       },
       stockSentiment: { ...parsedData.stockSentiment, summary: markdownToHtml(parsedData.stockSentiment?.summary) },
       recommendation: { ...parsedData.recommendation, details: markdownToHtml(parsedData.recommendation?.details) },
-      news: normalizeNewsList(parsedData.news, groundingSources, tickerSymbol),
+      news: (realtimeInfo?.news && realtimeInfo.news.length > 0) 
+        ? realtimeInfo.news 
+        : normalizeNewsList(parsedData.news, groundingSources, tickerSymbol),
       groundingSources
     };
 

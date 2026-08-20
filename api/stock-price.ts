@@ -1,3 +1,66 @@
+export interface StockNewsItem {
+  title: string;
+  link?: string;
+  publisher?: string;
+  time?: string;
+}
+
+async function fetchLatestStockNews(symbol: string): Promise<StockNewsItem[]> {
+  try {
+    const query = encodeURIComponent(`${symbol} chứng khoán OR cổ phiếu when:7d`);
+    const gNewsUrl = `https://news.google.com/rss/search?q=${query}&hl=vi&gl=VN&ceid=VN:vi`;
+    
+    const res = await fetch(gNewsUrl);
+    if (!res.ok) return [];
+
+    const xml = await res.text();
+    const items: StockNewsItem[] = [];
+    const itemRegex = /<item>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<pubDate>(.*?)<\/pubDate>(?:[\s\S]*?<source[^>]*>(.*?)<\/source>)?/g;
+    
+    let match;
+    while ((match = itemRegex.exec(xml)) !== null && items.length < 6) {
+      let rawTitle = (match[1] || '').replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+      const link = (match[2] || '').trim();
+      const rawDate = (match[3] || '').trim();
+      let source = (match[4] || '').replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+
+      // If source not extracted from <source>, extract from end of title (e.g. "... - VnEconomy")
+      if (!source && rawTitle.includes(' - ')) {
+        const parts = rawTitle.split(' - ');
+        source = parts.pop() || '';
+        rawTitle = parts.join(' - ');
+      }
+
+      // Format time
+      let formattedTime = 'Gần đây';
+      try {
+        const pubTime = new Date(rawDate);
+        const diffHours = Math.round((Date.now() - pubTime.getTime()) / (1000 * 3600));
+        if (diffHours < 24) {
+          formattedTime = diffHours <= 1 ? 'Vừa xong' : `${diffHours} giờ trước`;
+        } else {
+          const diffDays = Math.round(diffHours / 24);
+          formattedTime = `${diffDays} ngày trước`;
+        }
+      } catch (e) {
+        // Keep default
+      }
+
+      items.push({
+        title: rawTitle,
+        link,
+        publisher: source || 'Tin tức tài chính',
+        time: formattedTime
+      });
+    }
+
+    return items;
+  } catch (err) {
+    console.warn(`Could not fetch news for ${symbol}:`, err);
+    return [];
+  }
+}
+
 export default async function handler(req: any, res: any) {
   const symbol = ((req.query.symbol as string) || '').trim().toUpperCase();
   if (!symbol) {
@@ -9,7 +72,12 @@ export default async function handler(req: any, res: any) {
   const url = `https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${now}&symbol=${symbol}&resolution=1D`;
 
   try {
-    const apiRes = await fetch(url);
+    // Chạy song song: Lấy giá Live từ sàn + Lấy tin tức 7 ngày gần nhất
+    const [apiRes, newsItems] = await Promise.all([
+      fetch(url),
+      fetchLatestStockNews(symbol)
+    ]);
+
     if (!apiRes.ok) {
       return res.status(apiRes.status).json({ error: `DNSE API returned status ${apiRes.status}` });
     }
@@ -31,7 +99,8 @@ export default async function handler(req: any, res: any) {
         low: Math.round(lastLow * 1000),
         volume: lastVol,
         date: data.t ? new Date(data.t[count - 1] * 1000).toLocaleDateString('vi-VN') : undefined,
-        source: 'Dữ liệu giao dịch sàn HOSE/HNX'
+        source: 'Dữ liệu giao dịch sàn HOSE/HNX',
+        news: newsItems
       });
     }
 
