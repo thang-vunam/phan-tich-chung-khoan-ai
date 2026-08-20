@@ -492,10 +492,11 @@ const generateAnalysisPrompt = (tickerSymbol: string, customPrice?: string, real
   const newsContext = (realtimeInfo?.news && realtimeInfo.news.length > 0)
     ? `DANH SÁCH BÀI BÁO THỰC TẾ TRONG 7 NGÀY GẦN NHẤT:
 ${realtimeInfo.news.map((n, i) => `${i + 1}. "${n.title}" (Nguồn: ${n.publisher}, Thời gian: ${n.time})`).join('\n')}
-BẮT BUỘC: Bạn PHẢI sử dụng và trích xuất các bài báo trong danh sách thực tế trên để điền vào trường "news". Tuyệt đối KHÔNG tự bịa đặt tin tức từ các năm trước.`
+BẮT BUỘC: Bạn PHẢI sử dụng và trích xuất các bài báo trong danh sách thực tế trên để điền vào trường "news".`
     : `YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP trong 7 ngày gần đây. Nếu không có tin trong 7 ngày, trả về "news": [].`;
 
-  return `Bạn là chuyên gia phân tích chứng khoán VN. Phân tích súc tích mã cổ phiếu "${tickerSymbol}".
+  return `Bạn là Giám đốc Phân tích Đầu tư Chứng khoán Cao cấp (Head of Equity Research) hàng đầu tại Việt Nam. Hãy lập BÁO CÁO PHÂN TÍCH CHUYÊN SÂU, TOÀN DIỆN VÀ SẮC BÉN về mã cổ phiếu "${tickerSymbol}".
+
 DỮ LIỆU THỊ TRƯỜNG THỰC TẾ TÍNH ĐẾN ${formattedDate}:
 ${priceContext}
 Trường "assumedDate" phải là ${formattedDate}.
@@ -504,34 +505,53 @@ ${newsContext}
 
 QUY TẮC BẮT BUỘC VỀ TỒN TẠI MÃ CỔ PHIẾU:
 - "${tickerSymbol}" BẮT BUỘC phải là một mã chứng khoán/cổ phiếu/chứng chỉ quỹ CÓ THẬT được niêm yết trên các sàn chứng khoán Việt Nam (HOSE, HNX, UPCOM).
-- Nếu "${tickerSymbol}" KHÔNG PHẢI là mã chứng khoán có thật (ví dụ từ vô nghĩa, tên ngành, mã không niêm yết...), bạn PHẢI trả về JSON:
+- Nếu "${tickerSymbol}" KHÔNG PHẢI là mã chứng khoán có thật, bạn PHẢI trả về JSON:
 {"isValid": false, "error": "Mã cổ phiếu '${tickerSymbol}' không tồn tại trên thị trường chứng khoán Việt Nam. Vui lòng kiểm tra lại."}
 TUYỆT ĐỐI KHÔNG tự bịa đặt thông tin hoặc phân tích sang mã khác!
 
-YÊU CẦU ĐỊNH GIÁ:
+YÊU CẦU ĐỊNH GIÁ & MỤC TIÊU GIÁ:
 - Trường "closingPrice" PHẢI LÀ "${customPrice ? `${customPrice} VND` : realtimeInfo ? realtimeInfo.formattedPrice : 'Giá thị trường'}".
 - Các mức giá mục tiêu trong "targetPrices" (shortTerm, midTerm, longTerm): ${targetPriceRule}.
+- Phải có tỷ lệ phần trăm kỳ vọng (+X%) và luận điểm ngắn gọn, thuyết phục trong "label".
 
-YÊU CẦU PHÂN TÍCH: Trình bày súc tích, gạch đầu dòng rõ ràng, đi thẳng vào các luận điểm và số liệu cốt lõi, tránh diễn giải dài dòng.
-Trả về JSON cấu trúc:
+YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC ĐẦY ĐỦ, ĐÀO SÂU, CÓ SỐ LIỆU VÀ GÓC NHÌN ĐA CHIỀU):
+1. "macro" (Phân tích Vĩ mô & Vi mô): Phân tích tác động của mặt bằng lãi suất, điều hành chính sách tiền tệ của NHNN, tỷ giá USD/VND, lạm phát và các chính sách hỗ trợ ngành tới hoạt động kinh doanh của doanh nghiệp.
+2. "industry" (Phân tích Ngành): Phân tích chu kỳ ngành, vị thế thị phần của doanh nghiệp so với các đối thủ cùng ngành, biên lợi nhuận toàn ngành, triển vọng tiêu thụ và các yếu tố xúc tác (catalysts) mới của ngành.
+3. "fundamental" (Phân tích Cơ bản Doanh nghiệp):
+   - Nêu rõ các chỉ số tài chính cốt lõi: Doanh thu, Lợi nhuận sau thuế, Biên lợi nhuận gộp/ròng, ROE, ROA, P/E hiện tại so với P/E trung bình ngành, P/B, tỷ lệ đòn bẩy Nợ/Vốn chủ sở hữu.
+   - Luận điểm tăng trưởng doanh nghiệp (mở rộng mạng lưới, cải thiện hiệu quả, công suất mới...) và các rủi ro tài chính cần lưu ý.
+4. "technical" (Phân tích Kỹ thuật & Dòng tiền):
+   - Nhận định xu hướng giá ngắn hạn và trung hạn.
+   - Chỉ rõ các ngưỡng HỖ TRỢ và KHÁNG CỰ then chốt (kèm mức giá cụ thể).
+   - Tín hiệu các chỉ báo kỹ thuật quan trọng (RSI, MACD, đường MA20, MA50, MA200).
+   - Đánh giá dòng tiền lớn (Smart Money), hành vi giao dịch của Khối ngoại và Tự doanh.
+5. "forumSentiment" (Tâm lý Cộng đồng & Diễn đàn F319): Đánh giá tâm lý số đông nhà đầu tư cá nhân trên thị trường, mức độ chú ý và kỳ vọng của cộng đồng đối với mã cổ phiếu này.
+6. "recommendation" (Khuyến nghị Chiến lược Đầu tư):
+   - "action": "MUA" | "BÁN" | "NẮM GIỮ" | "THEO DÕI"
+   - "details": Chiến lược giải ngân cụ thể (vùng giá mua gom tối ưu, vùng chốt lời từng phần, ngưỡng cắt lỗ Stop-loss kỷ luật và phân bổ tỷ trọng vốn hợp lý).
+
+Trả về đúng JSON theo cấu trúc:
 {
   "isValid": true,
   "assumedDate": "string",
   "closingPrice": "string",
-  "marketSentiment": { "score": 0-100, "summary": "markdown súc tích", "vnIndexTrend": "string", "foreignInvestors": "string", "liquidity": "string" },
-  "stockSentiment": { "score": 0-100, "summary": "markdown súc tích" },
-  "macro": "markdown súc tích", "industry": "markdown súc tích", "fundamental": "markdown súc tích", "technical": "markdown súc tích", "forumSentiment": "markdown",
-  "recommendation": { "action": "MUA|BÁN|NẮM GIỮ", "details": "markdown súc tích" },
+  "marketSentiment": { "score": 0-100, "summary": "markdown phân tích sâu sắc tâm lý thị trường chung", "vnIndexTrend": "string", "foreignInvestors": "string", "liquidity": "string" },
+  "stockSentiment": { "score": 0-100, "summary": "markdown đánh giá sức mạnh nội tại và độ khỏe tương đối (RS) của cổ phiếu" },
+  "macro": "markdown phân tích chuyên sâu vĩ mô",
+  "industry": "markdown phân tích chuyên sâu ngành",
+  "fundamental": "markdown phân tích chi tiết tài chính và cơ bản",
+  "technical": "markdown phân tích kỹ thuật và dòng tiền sắc sảo",
+  "forumSentiment": "markdown đánh giá tâm lý diễn đàn",
+  "recommendation": { "action": "MUA|BÁN|NẮM GIỮ|THEO DÕI", "details": "markdown chiến lược đầu tư chi tiết" },
   "targetPrices": { 
     "shortTerm": { "value": number, "label": "string" }, 
     "midTerm": { "value": number, "label": "string" }, 
     "longTerm": { "value": number, "label": "string" } 
   },
   "news": [
-    { "title": "Tiêu đề tin tức thực tế", "publisher": "Vietstock", "time": "2 ngày trước" }
+    { "title": "Tiêu đề tin tức", "publisher": "Báo", "time": "Thời gian" }
   ]
-}
-Ghi chú: "targetPrices" phải có "value" là số nguyên và "label" là chuỗi mô tả kèm lý do súc tích.`;
+}`;
 };
 
 // ==========================================
