@@ -320,6 +320,50 @@ const extractBalancedJson = (str: string): string => {
   return str.substring(firstBrace);
 };
 
+const repairTruncatedJson = (str: string): string => {
+  let cleaned = str.trim();
+  let openBraces = 0;
+  let openBrackets = 0;
+  let inString = false;
+  let isEscaped = false;
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+      } else if (char === '\\') {
+        isEscaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+    } else {
+      if (char === '"') {
+        inString = true;
+      } else if (char === '{') {
+        openBraces++;
+      } else if (char === '}') {
+        openBraces--;
+      } else if (char === '[') {
+        openBrackets++;
+      } else if (char === ']') {
+        openBrackets--;
+      }
+    }
+  }
+
+  if (inString) cleaned += '"';
+  while (openBrackets > 0) {
+    cleaned += ']';
+    openBrackets--;
+  }
+  while (openBraces > 0) {
+    cleaned += '}';
+    openBraces--;
+  }
+  return cleaned;
+};
+
 const parseJsonResponse = (text: string) => {
     let cleanStr = text.trim();
 
@@ -345,7 +389,17 @@ const parseJsonResponse = (text: string) => {
         const cleanedCommas = sanitized.replace(/,(\s*[\]}])/g, '$1');
         return JSON.parse(cleanedCommas);
     } catch (err) {
-        console.error("Failed to parse sanitized JSON. Original text preview:", text.substring(0, 500));
+        // Fallback to auto-repairing truncated JSON
+    }
+
+    // 5. Try auto-repairing truncated braces and quotes
+    try {
+        const repaired = repairTruncatedJson(cleanStr);
+        const sanitized = sanitizeJsonString(repaired);
+        const cleanedCommas = sanitized.replace(/,(\s*[\]}])/g, '$1');
+        return JSON.parse(cleanedCommas);
+    } catch (err) {
+        console.error("Failed to parse JSON even after repair. Original text preview:", text.substring(0, 500));
         throw err;
     }
 };
@@ -487,6 +541,7 @@ const sendChatWithToolFallback = async (
       model: PRO_MODEL,
       config: {
         temperature: 0.1,
+        maxOutputTokens: 8192,
         tools: [{ googleSearch: {} }],
         systemInstruction,
       },
@@ -511,6 +566,7 @@ const sendChatWithToolFallback = async (
         model: PRO_MODEL,
         config: {
           temperature: 0.1,
+          maxOutputTokens: 8192,
           systemInstruction,
         },
       });
