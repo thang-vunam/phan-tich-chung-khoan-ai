@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
-    const freeKey = env.GEMINI_FREE_API_KEY || env.GEMINI_API_KEY || process.env.GEMINI_FREE_API_KEY || process.env.GEMINI_API_KEY || 'AIzaSyDZVB-Lk5gQLAaKKqGyWbj75iIs_4fMxG4';
-    const paidKey = env.GEMINI_PAID_API_KEY || process.env.GEMINI_PAID_API_KEY || 'AIzaSyBhfnznexZa-6v8ycwySvG8Go9IDN_t9AA';
+    const freeKey = env.GEMINI_FREE_API_KEY || env.GEMINI_API_KEY || process.env.GEMINI_FREE_API_KEY || process.env.GEMINI_API_KEY || '';
+    const paidKey = env.GEMINI_PAID_API_KEY || process.env.GEMINI_PAID_API_KEY || '';
 
     return {
       server: {
