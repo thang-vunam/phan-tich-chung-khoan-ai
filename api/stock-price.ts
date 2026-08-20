@@ -8,55 +8,70 @@ export interface StockNewsItem {
 
 async function fetchLatestStockNews(symbol: string): Promise<StockNewsItem[]> {
   try {
-    const query = encodeURIComponent(`${symbol} chứng khoán OR cổ phiếu when:7d`);
-    const gNewsUrl = `https://news.google.com/rss/search?q=${query}&hl=vi&gl=VN&ceid=VN:vi`;
-    
-    const res = await fetch(gNewsUrl);
-    if (!res.ok) return [];
+    const q1 = encodeURIComponent(`${symbol} (chứng khoán OR cổ phiếu) when:7d`);
+    const q2 = encodeURIComponent(`${symbol} ("kết quả kinh doanh" OR "lợi nhuận" OR "doanh thu" OR "báo cáo tài chính" OR "quý")`);
 
-    const xml = await res.text();
-    const items: StockNewsItem[] = [];
-    const itemRegex = /<item>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<pubDate>(.*?)<\/pubDate>(?:[\s\S]*?<source[^>]*>(.*?)<\/source>)?/g;
-    
-    let match;
-    while ((match = itemRegex.exec(xml)) !== null && items.length < 6) {
-      let rawTitle = (match[1] || '').replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
-      const link = (match[2] || '').trim();
-      const rawDate = (match[3] || '').trim();
-      let source = (match[4] || '').replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+    const [res1, res2] = await Promise.all([
+      fetch(`https://news.google.com/rss/search?q=${q1}&hl=vi&gl=VN&ceid=VN:vi`).catch(() => null),
+      fetch(`https://news.google.com/rss/search?q=${q2}&hl=vi&gl=VN&ceid=VN:vi`).catch(() => null)
+    ]);
 
-      // If source not extracted from <source>, extract from end of title (e.g. "... - VnEconomy")
-      if (!source && rawTitle.includes(' - ')) {
-        const parts = rawTitle.split(' - ');
-        source = parts.pop() || '';
-        rawTitle = parts.join(' - ');
-      }
+    const parseXml = async (res: any) => {
+      if (!res || !res.ok) return [];
+      const xml = await res.text();
+      const items: StockNewsItem[] = [];
+      const itemRegex = /<item>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<pubDate>(.*?)<\/pubDate>(?:[\s\S]*?<source[^>]*>(.*?)<\/source>)?/g;
+      
+      let match;
+      while ((match = itemRegex.exec(xml)) !== null && items.length < 5) {
+        let rawTitle = (match[1] || '').replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+        const link = (match[2] || '').trim();
+        const rawDate = (match[3] || '').trim();
+        let source = (match[4] || '').replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
 
-      // Format time
-      let formattedTime = 'Gần đây';
-      try {
-        const pubTime = new Date(rawDate);
-        const diffHours = Math.round((Date.now() - pubTime.getTime()) / (1000 * 3600));
-        if (diffHours < 24) {
-          formattedTime = diffHours <= 1 ? 'Vừa xong' : `${diffHours} giờ trước`;
-        } else {
-          const diffDays = Math.round(diffHours / 24);
-          formattedTime = `${diffDays} ngày trước`;
+        if (!source && rawTitle.includes(' - ')) {
+          const parts = rawTitle.split(' - ');
+          source = parts.pop() || '';
+          rawTitle = parts.join(' - ');
         }
-      } catch (e) {
-        // Keep default
-      }
 
-      items.push({
-        title: rawTitle,
-        url: link,
-        link: link,
-        publisher: source || 'Tin tức tài chính',
-        time: formattedTime
-      });
+        let formattedTime = 'Gần đây';
+        try {
+          const pubTime = new Date(rawDate);
+          const diffHours = Math.round((Date.now() - pubTime.getTime()) / (1000 * 3600));
+          if (diffHours < 24) {
+            formattedTime = diffHours <= 1 ? 'Vừa xong' : `${diffHours} giờ trước`;
+          } else {
+            const diffDays = Math.round(diffHours / 24);
+            formattedTime = `${diffDays} ngày trước`;
+          }
+        } catch (e) {}
+
+        items.push({
+          title: rawTitle,
+          url: link,
+          link: link,
+          publisher: source || 'Tin tức tài chính',
+          time: formattedTime
+        });
+      }
+      return items;
+    };
+
+    const [items1, items2] = await Promise.all([parseXml(res1), parseXml(res2)]);
+    
+    // Ghép và lọc trùng lặp
+    const seen = new Set<string>();
+    const merged: StockNewsItem[] = [];
+    for (const item of [...items1, ...items2]) {
+      const key = item.title.toLowerCase().substring(0, 30);
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(item);
+      }
     }
 
-    return items;
+    return merged.slice(0, 7);
   } catch (err) {
     console.warn(`Could not fetch news for ${symbol}:`, err);
     return [];

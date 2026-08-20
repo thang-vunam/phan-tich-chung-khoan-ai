@@ -576,10 +576,12 @@ YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC ĐẦY ĐỦ, Đ
 1. "macro" (Phân tích Vĩ mô & Vi mô): Phân tích tác động của mặt bằng lãi suất, điều hành chính sách tiền tệ của NHNN, tỷ giá USD/VND, lạm phát và các chính sách hỗ trợ ngành tới hoạt động kinh doanh của doanh nghiệp.
 2. "industry" (Phân tích Ngành): Phân tích chu kỳ ngành, vị thế thị phần của doanh nghiệp so với các đối thủ cùng ngành, biên lợi nhuận toàn ngành, triển vọng tiêu thụ và các yếu tố xúc tác (catalysts) mới của ngành.
 3. "fundamental" (Phân tích Cơ bản Doanh nghiệp):
-   - Phân tích chi tiết mô hình kinh doanh, doanh thu, lợi nhuận gộp, biên lợi nhuận ròng, dòng tiền kinh doanh.
-   - Đánh giá định giá cổ phiếu (${realtimeInfo?.formattedPrice || 'giá thị trường'} tương ứng với P/E, P/B và quy mô vốn hóa thị trường hiện tại).
-   - Đánh giá sức khỏe bảng cân đối kế toán: Tỷ lệ Nợ vay / Vốn chủ sở hữu, năng lực thanh toán, lượng tiền mặt dự trữ.
-   - Các động lực tăng trưởng mới (mở rộng mạng lưới cửa hàng, nâng cao năng suất, chuyển đổi số...) và rủi ro cạnh tranh cần theo dõi sát sao.
+   - CẬP NHẬT KẾT QUẢ KINH DOANH MỚI NHẤT (BẮT BUỘC ĐỊNH LƯỢNG): Nêu rõ số liệu Doanh thu thuần, Lợi nhuận sau thuế (LNST) của các quý gần nhất (Quý 1, Quý 2 năm 2026 hoặc năm tài chính mới nhất) đạt bao nhiêu tỷ đồng, tăng trưởng bao nhiêu % so với cùng kỳ (YoY) hoặc so với quý trước.
+   - BIÊN LỢI NHUẬN & HIỆU QUẢ HOẠT ĐỘNG: Phân tích chi tiết Biên lợi nhuận gộp và Biên lợi nhuận ròng, ROE, ROA, EPS.
+   - ĐỊNH GIÁ: Định giá P/E, P/B hiện tại ở mức giá "${realtimeInfo?.formattedPrice || 'thị trường'}" so với trung bình ngành và định giá lịch sử.
+   - SỨC KHỎE TÀI CHÍNH: Tỷ lệ Nợ vay/Vốn chủ sở hữu (D/E), cơ cấu nợ, dòng tiền kinh doanh (CFO).
+   - ĐỘNG LỰC TĂNG TRƯỞNG & RỦI RO: Công suất, đơn hàng, mở rộng thị phần, rủi ro nguyên vật liệu/cạnh tranh.
+   - TUYỆT ĐỐI KHÔNG nhận định định tính chung chung (như "duy trì tốt", "ở mức kiểm soát") mà PHẢI đưa ra số liệu, tỷ lệ % hoặc phân tích nguyên nhân tài chính cụ thể.
 4. "technical" (Phân tích Kỹ thuật & Dòng tiền):
    - Nhận định xu hướng giá ngắn hạn và trung hạn.
    - Chỉ rõ các ngưỡng HỖ TRỢ và KHÁNG CỰ then chốt (kèm mức giá cụ thể).
