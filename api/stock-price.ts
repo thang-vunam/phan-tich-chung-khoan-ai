@@ -93,46 +93,56 @@ export default async function handler(req: any, res: any) {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const fromStock = now - 86400 * 7;
-  const fromIndex = now - 86400 * 30; // 30 ngày nến để tính đỉnh đáy và xu hướng động
-  const url = `https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromStock}&to=${now}&symbol=${symbol}&resolution=1D`;
+  const fromIntraday = now - 3600 * 6; // 6 giờ gần nhất (nến 1 phút trong phiên)
+  const fromDaily = now - 86400 * 30; // 30 ngày nến để tính đỉnh đáy và xu hướng động
 
   try {
-    // Chạy song song: Lấy giá Live từ sàn + Nến 30 phiên của 3 sàn (HOSE, HNX, UPCOM) + Tin tức kép
-    const [apiRes, vnIndexRes, hnxRes, upcomRes, newsItems] = await Promise.all([
-      fetch(url),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${now}&symbol=VNINDEX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${now}&symbol=HNX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${now}&symbol=UPCOM&resolution=1D`).catch(() => null),
+    // Chạy song song: Lấy giá Live 1-phút trong phiên + Nến ngày lịch sử + Nến 30 phiên của 3 sàn (HOSE, HNX, UPCOM) + Tin tức kép
+    const [stock1mRes, stock1dRes, vnIndex1mRes, vnIndex1dRes, hnxRes, upcomRes, newsItems] = await Promise.all([
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromIntraday}&to=${now}&symbol=${symbol}&resolution=1`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromDaily}&to=${now}&symbol=${symbol}&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIntraday}&to=${now}&symbol=VNINDEX&resolution=1`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromDaily}&to=${now}&symbol=VNINDEX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromDaily}&to=${now}&symbol=HNX&resolution=1D`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromDaily}&to=${now}&symbol=UPCOM&resolution=1D`).catch(() => null),
       fetchLatestStockNews(symbol)
     ]);
 
-    if (!apiRes.ok) {
-      return res.status(apiRes.status).json({ error: `DNSE API returned status ${apiRes.status}` });
-    }
-
-    const parseIndex = (resObj: any) => {
+    const parseJson = async (resObj: any) => {
       if (!resObj || !resObj.ok) return undefined;
       try {
-        return resObj.json();
+        return await resObj.json();
       } catch (e) {
         return undefined;
       }
     };
 
-    const [vnData, hnxData, upcomData] = await Promise.all([
-      parseIndex(vnIndexRes),
-      parseIndex(hnxRes),
-      parseIndex(upcomRes)
+    const [stock1mData, stock1dData, vn1mData, vn1dData, hnxData, upcomData] = await Promise.all([
+      parseJson(stock1mRes),
+      parseJson(stock1dRes),
+      parseJson(vnIndex1mRes),
+      parseJson(vnIndex1dRes),
+      parseJson(hnxRes),
+      parseJson(upcomRes)
     ]);
 
-    const computeDynamicTrend = (data: any, name: string) => {
-      if (!data || !data.c || data.c.length === 0) return undefined;
-      const count = data.c.length;
-      const current = data.c[count - 1];
+    if (!stock1mData && !stock1dData) {
+      return res.status(404).json({ error: `Không tìm thấy dữ liệu giao dịch cho mã ${symbol}` });
+    }
+
+    const computeDynamicTrend = (dailyData: any, live1mData: any, name: string) => {
+      if (!dailyData || !dailyData.c || dailyData.c.length === 0) return undefined;
+      const count = dailyData.c.length;
+      let current = dailyData.c[count - 1];
+
+      // Nếu có nến 1 phút Live hôm nay, cập nhật điểm số chính xác đến từng phút
+      if (live1mData && live1mData.c && live1mData.c.length > 0) {
+        current = live1mData.c[live1mData.c.length - 1];
+      }
+
       const sampleSize = Math.min(count, 15);
-      const highs = data.h ? data.h.slice(-sampleSize) : [current];
-      const lows = data.l ? data.l.slice(-sampleSize) : [current];
+      const highs = dailyData.h ? dailyData.h.slice(-sampleSize) : [current];
+      const lows = dailyData.l ? dailyData.l.slice(-sampleSize) : [current];
       
       const highest = Math.max(...highs);
       const lowest = Math.min(...lows);
@@ -159,42 +169,60 @@ export default async function handler(req: any, res: any) {
         lowest: Number(lowest.toFixed(2)),
         pctFromHigh: Number(pctFromHigh.toFixed(2)),
         pctFromLow: Number(pctFromLow.toFixed(2)),
-        volume: data.v ? data.v[count - 1] : undefined,
+        volume: dailyData.v ? dailyData.v[count - 1] : undefined,
         trendDescription
       };
     };
 
-    const vnIndexInfo = computeDynamicTrend(vnData, 'VN-INDEX');
-    const hnxInfo = computeDynamicTrend(hnxData, 'HNX-INDEX');
-    const upcomInfo = computeDynamicTrend(upcomData, 'UPCOM-INDEX');
+    const vnIndexInfo = computeDynamicTrend(vn1dData, vn1mData, 'VN-INDEX');
+    const hnxInfo = computeDynamicTrend(hnxData, null, 'HNX-INDEX');
+    const upcomInfo = computeDynamicTrend(upcomData, null, 'UPCOM-INDEX');
 
-    const data = await apiRes.json();
-    if (data.c && data.c.length > 0) {
-      const count = data.c.length;
-      const lastClose = data.c[count - 1];
-      const lastHigh = data.h ? data.h[count - 1] : lastClose;
-      const lastLow = data.l ? data.l[count - 1] : lastClose;
-      const lastVol = data.v ? data.v[count - 1] : 0;
-      const priceVND = Math.round(lastClose * 1000);
+    // Xác định giá Live thời gian thực của cổ phiếu
+    let lastClose = 0;
+    let lastHigh = 0;
+    let lastLow = 0;
+    let lastVol = 0;
+    let lastDateStr = '';
+    let isLiveSession = false;
 
-      return res.status(200).json({
-        ticker: symbol,
-        price: priceVND,
-        formattedPrice: `${priceVND.toLocaleString('vi-VN')} VND`,
-        high: Math.round(lastHigh * 1000),
-        low: Math.round(lastLow * 1000),
-        volume: lastVol,
-        vnIndex: vnIndexInfo,
-        hnxIndex: hnxInfo,
-        upcomIndex: upcomInfo,
-        date: data.t ? new Date(data.t[count - 1] * 1000).toLocaleDateString('vi-VN') : undefined,
-        source: 'Dữ liệu giao dịch sàn HOSE/HNX/UPCOM',
-        news: newsItems
-      });
+    // Ưu tiên nến 1 phút Live trong phiên hôm nay
+    if (stock1mData && stock1mData.c && stock1mData.c.length > 0) {
+      const count1m = stock1mData.c.length;
+      lastClose = stock1mData.c[count1m - 1];
+      lastHigh = Math.max(...stock1mData.h);
+      lastLow = Math.min(...stock1mData.l);
+      lastVol = stock1mData.v.reduce((sum: number, v: number) => sum + (v || 0), 0);
+      lastDateStr = new Date(stock1mData.t[count1m - 1] * 1000).toLocaleTimeString('vi-VN') + ' ' + new Date(stock1mData.t[count1m - 1] * 1000).toLocaleDateString('vi-VN');
+      isLiveSession = true;
+    } else if (stock1dData && stock1dData.c && stock1dData.c.length > 0) {
+      const count1d = stock1dData.c.length;
+      lastClose = stock1dData.c[count1d - 1];
+      lastHigh = stock1dData.h ? stock1dData.h[count1d - 1] : lastClose;
+      lastLow = stock1dData.l ? stock1dData.l[count1d - 1] : lastClose;
+      lastVol = stock1dData.v ? stock1dData.v[count1d - 1] : 0;
+      lastDateStr = stock1dData.t ? new Date(stock1dData.t[count1d - 1] * 1000).toLocaleDateString('vi-VN') : '';
     }
 
-    return res.status(404).json({ error: `Không tìm thấy dữ liệu cho mã ${symbol}` });
+    const priceVND = Math.round(lastClose * 1000);
+
+    return res.status(200).json({
+      ticker: symbol,
+      price: priceVND,
+      formattedPrice: `${priceVND.toLocaleString('vi-VN')} VND`,
+      high: Math.round(lastHigh * 1000),
+      low: Math.round(lastLow * 1000),
+      volume: lastVol,
+      isLiveSession,
+      vnIndex: vnIndexInfo,
+      hnxIndex: hnxInfo,
+      upcomIndex: upcomInfo,
+      date: lastDateStr,
+      source: isLiveSession ? 'Khớp lệnh Real-time sàn HOSE/HNX/UPCOM' : 'Dữ liệu giao dịch sàn HOSE/HNX/UPCOM',
+      news: newsItems
+    });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Internal server error' });
+    console.error(`API Error /api/stock-price:`, err);
+    return res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 }

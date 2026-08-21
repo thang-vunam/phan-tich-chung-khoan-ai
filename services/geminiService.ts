@@ -473,25 +473,44 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
 
   // 2. Direct fetch fallback
   const to = Math.floor(Date.now() / 1000);
-  const fromStock = to - 86400 * 7;
+  const fromIntraday = to - 3600 * 6;
   const fromIndex = to - 86400 * 30;
   
   try {
-    const [stockRes, indexRes, hnxRes, upcomRes] = await Promise.all([
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromStock}&to=${to}&symbol=${cleanTicker}&resolution=1D`),
+    const [stockRes1m, stockRes1d, indexRes, hnxRes, upcomRes] = await Promise.all([
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromIntraday}&to=${to}&symbol=${cleanTicker}&resolution=1`).catch(() => null),
+      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromIndex}&to=${to}&symbol=${cleanTicker}&resolution=1D`).catch(() => null),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${to}&symbol=VNINDEX&resolution=1D`).catch(() => null),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${to}&symbol=HNX&resolution=1D`).catch(() => null),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${to}&symbol=UPCOM&resolution=1D`).catch(() => null)
     ]);
 
-    if (stockRes.ok) {
-      const data = await stockRes.json();
-      if (data.c && data.c.length > 0) {
-        const lastClose = data.c[data.c.length - 1];
-        const lastHigh = data.h ? data.h[data.h.length - 1] : lastClose;
-        const lastLow = data.l ? data.l[data.l.length - 1] : lastClose;
-        const lastVol = data.v ? data.v[data.v.length - 1] : 0;
-        const actualPriceVND = Math.round(lastClose * 1000);
+    let data1m: any = null;
+    let data1d: any = null;
+    if (stockRes1m && stockRes1m.ok) data1m = await stockRes1m.json();
+    if (stockRes1d && stockRes1d.ok) data1d = await stockRes1d.json();
+
+    let lastClose = 0;
+    let lastHigh = 0;
+    let lastLow = 0;
+    let lastVol = 0;
+
+    if (data1m && data1m.c && data1m.c.length > 0) {
+      const len = data1m.c.length;
+      lastClose = data1m.c[len - 1];
+      lastHigh = Math.max(...data1m.h);
+      lastLow = Math.min(...data1m.l);
+      lastVol = data1m.v.reduce((s: number, v: number) => s + (v || 0), 0);
+    } else if (data1d && data1d.c && data1d.c.length > 0) {
+      const len = data1d.c.length;
+      lastClose = data1d.c[len - 1];
+      lastHigh = data1d.h ? data1d.h[len - 1] : lastClose;
+      lastLow = data1d.l ? data1d.l[len - 1] : lastClose;
+      lastVol = data1d.v ? data1d.v[len - 1] : 0;
+    }
+
+    if (lastClose > 0) {
+      const actualPriceVND = Math.round(lastClose * 1000);
 
         const getDynamicIdx = async (res: any) => {
           if (!res || !res.ok) return undefined;
@@ -552,7 +571,6 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
           upcomIndex: upcomInfo,
           source: 'Dữ liệu giao dịch thực tế sàn HOSE/HNX/UPCOM'
         };
-      }
     }
   } catch (err) {
     console.warn(`Could not fetch realtime price for ${cleanTicker}:`, err);
