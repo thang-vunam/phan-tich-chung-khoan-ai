@@ -2,7 +2,8 @@
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import type { AnalysisResult, ComparisonResult, GroundingSource, MarketSentiment, IndustryAnalysisResult, NewsItem } from '../types';
 
-const PRO_MODEL = 'gemini-3.6-flash';
+const PRO_MODEL = 'gemini-2.5-flash';
+const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-3.6-flash'];
 
 const extractGroundingSources = (response: GenerateContentResponse): GroundingSource[] => {
     const sources: GroundingSource[] = [];
@@ -777,26 +778,38 @@ const sendChatWithToolFallback = async (
   message: string,
   systemInstruction: string
 ): Promise<{ response: GenerateContentResponse; chat: Chat }> => {
-  // Use direct JSON mode - no Google Search tool (incompatible with responseMimeType
-  // and always hits quota 0 on free tier anyway)
-  const chat = ai.chats.create({
-    model: PRO_MODEL,
-    config: {
-      temperature: 0.1,
-      maxOutputTokens: 8192,
-      responseMimeType: 'application/json',
-      systemInstruction,
-    },
-  });
-  const response = await chat.sendMessage({ message });
-  
-  // Safety check: ensure we got actual content back
-  const text = response.text || '';
-  if (!text.trim()) {
-    throw new Error('Gemini API trả về phản hồi rỗng. Vui lòng thử lại.');
+  let lastError: any = null;
+
+  for (const modelName of FALLBACK_MODELS) {
+    try {
+      const chat = ai.chats.create({
+        model: modelName,
+        config: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json',
+          systemInstruction,
+        },
+      });
+      const response = await chat.sendMessage({ message });
+      
+      const text = response.text || '';
+      if (text.trim()) {
+        return { response, chat };
+      }
+    } catch (err: any) {
+      console.warn(`Model ${modelName} encountered error:`, err?.message || err);
+      lastError = err;
+    }
+  }
+
+  // Format friendly message if 429
+  const errMsg = lastError?.message || lastError?.toString() || '';
+  if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota')) {
+    throw new Error('⚠️ Hạn mức gọi API Google Gemini của tài khoản tạm thời đạt giới hạn trong ngày/phút. Vui lòng đợi trong giây lát hoặc thử lại sau!');
   }
   
-  return { response, chat };
+  throw lastError || new Error('Gemini API trả về phản hồi rỗng. Vui lòng thử lại.');
 };
 
 const fetchStockAnalysisInternal = async (tickerSymbol: string, customPrice?: string): Promise<{ result: AnalysisResult; chat: Chat }> => {
