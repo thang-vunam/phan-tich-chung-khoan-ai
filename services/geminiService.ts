@@ -198,7 +198,7 @@ export function markdownToHtml(rawInput: any): string {
         if (numberedHeaderMatch) {
             closeList();
             sectionCounter++;
-            const titleContent = numberedHeaderMatch[2];
+            const titleContent = numberedHeaderMatch[2].replace(/^(\d+)[\.\)]\s*/, '').trim();
             outputHtml.push(`<h4 class="text-base font-bold text-cyan-300 mt-4 mb-2 flex items-start gap-1.5"><span class="text-cyan-400 font-bold flex-shrink-0">${sectionCounter}.</span> <span>${styleInline(titleContent)}</span></h4>`);
             continue;
         }
@@ -617,28 +617,33 @@ QUY TẮC BẮT BUỘC VỀ TỒN TẠI MÃ CỔ PHIẾU:
 {"isValid": false, "error": "Mã cổ phiếu '${tickerSymbol}' không tồn tại trên thị trường chứng khoán Việt Nam. Vui lòng kiểm tra lại."}
 TUYỆT ĐỐI KHÔNG tự bịa đặt thông tin hoặc phân tích sang mã khác!
 
+QUY TẮC BẮT BUỘC VỀ ĐÁNH SỐ TIỂU MỤC TRONG TỪNG PHẦN:
+- Mỗi trường ("macro", "industry", "fundamental", "technical", "forumSentiment") là một chuyên mục hoàn toàn ĐỘC LẬP.
+- Bên trong MỖI TRƯỜNG, các tiểu mục BẮT BUỘC PHẢI ĐƯỢC ĐÁNH SỐ BẮT ĐẦU TỪ 1 (ví dụ: trong "macro" bắt đầu từ "1. ...", sang "industry" cũng BẮT ĐẦU LẠI TỪ "1. ...", sang "fundamental" cũng BẮT ĐẦU LẠI TỪ "1. ...").
+- TUYỆT ĐỐI KHÔNG đánh số liên tiếp giữa các trường (ví dụ: macro là 1 rồi sang industry lại bắt đầu bằng 2 là SAI).
+
 YÊU CẦU ĐỊNH GIÁ & MỤC TIÊU GIÁ:
 - Trường "closingPrice" PHẢI LÀ "${customPrice ? `${customPrice} VND` : realtimeInfo ? realtimeInfo.formattedPrice : 'Giá thị trường'}".
 - Các mức giá mục tiêu trong "targetPrices" (shortTerm, midTerm, longTerm): ${targetPriceRule}.
 - Phải có tỷ lệ phần trăm kỳ vọng (+X%) và luận điểm ngắn gọn, thuyết phục trong "label".
 
 YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC ĐẦY ĐỦ, ĐÀO SÂU, CÓ SỐ LIỆU VÀ GÓC NHÌN ĐA CHIỀU):
-1. "macro" (Phân tích Vĩ mô & Vi mô): Phân tích tác động của mặt bằng lãi suất, điều hành chính sách tiền tệ của NHNN, tỷ giá USD/VND, lạm phát và các chính sách hỗ trợ ngành tới hoạt động kinh doanh của doanh nghiệp.
-2. "industry" (Phân tích Ngành): Phân tích chu kỳ ngành, vị thế thị phần của doanh nghiệp so với các đối thủ cùng ngành, biên lợi nhuận toàn ngành, triển vọng tiêu thụ và các yếu tố xúc tác (catalysts) mới của ngành.
-3. "fundamental" (Phân tích Cơ bản Doanh nghiệp):
+• "macro" (Phân tích Vĩ mô & Vi mô): Gồm 2-3 tiểu mục (đánh số 1, 2, 3) phân tích tác động của mặt bằng lãi suất, điều hành chính sách tiền tệ của NHNN, tỷ giá USD/VND, lạm phát và các chính sách hỗ trợ ngành tới hoạt động kinh doanh của doanh nghiệp.
+• "industry" (Phân tích Ngành): Gồm 2-3 tiểu mục (đánh số 1, 2, 3) phân tích chu kỳ ngành, vị thế thị phần của doanh nghiệp so với các đối thủ cùng ngành, biên lợi nhuận toàn ngành, triển vọng tiêu thụ và các yếu tố xúc tác (catalysts) mới của ngành.
+• "fundamental" (Phân tích Cơ bản Doanh nghiệp): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
    - CẬP NHẬT KẾT QUẢ KINH DOANH MỚI NHẤT (BẮT BUỘC ĐỊNH LƯỢNG): Nêu rõ số liệu Doanh thu thuần, Lợi nhuận sau thuế (LNST) của các quý gần nhất (Quý 1, Quý 2 năm 2026 hoặc năm tài chính mới nhất) đạt bao nhiêu tỷ đồng, tăng trưởng bao nhiêu % so với cùng kỳ (YoY) hoặc so với quý trước.
    - BIÊN LỢI NHUẬN & HIỆU QUẢ HOẠT ĐỘNG: Phân tích chi tiết Biên lợi nhuận gộp và Biên lợi nhuận ròng, ROE, ROA, EPS.
    - ĐỊNH GIÁ: Định giá P/E, P/B hiện tại ở mức giá "${realtimeInfo?.formattedPrice || 'thị trường'}" so với trung bình ngành và định giá lịch sử.
    - SỨC KHỎE TÀI CHÍNH: Tỷ lệ Nợ vay/Vốn chủ sở hữu (D/E), cơ cấu nợ, dòng tiền kinh doanh (CFO).
    - ĐỘNG LỰC TĂNG TRƯỞNG & RỦI RO: Công suất, đơn hàng, mở rộng thị phần, rủi ro nguyên vật liệu/cạnh tranh.
    - TUYỆT ĐỐI KHÔNG nhận định định tính chung chung (như "duy trì tốt", "ở mức kiểm soát") mà PHẢI đưa ra số liệu, tỷ lệ % hoặc phân tích nguyên nhân tài chính cụ thể.
-4. "technical" (Phân tích Kỹ thuật & Dòng tiền):
+• "technical" (Phân tích Kỹ thuật & Dòng tiền): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
    - Nhận định xu hướng giá ngắn hạn và trung hạn.
    - Chỉ rõ các ngưỡng HỖ TRỢ và KHÁNG CỰ then chốt (kèm mức giá cụ thể).
    - Tín hiệu các chỉ báo kỹ thuật quan trọng (RSI, MACD, đường MA20, MA50, MA200).
    - Đánh giá dòng tiền lớn (Smart Money), hành vi giao dịch của Khối ngoại và Tự doanh.
-5. "forumSentiment" (Tâm lý Cộng đồng & Diễn đàn F319): Đánh giá tâm lý số đông nhà đầu tư cá nhân trên thị trường, mức độ chú ý và kỳ vọng của cộng đồng đối với mã cổ phiếu này.
-6. "recommendation" (Khuyến nghị Chiến lược Đầu tư):
+• "forumSentiment" (Tâm lý Cộng đồng & Diễn đàn F319): Gồm 2-3 tiểu mục (đánh số 1, 2, 3) đánh giá tâm lý số đông nhà đầu tư cá nhân trên thị trường, mức độ chú ý và kỳ vọng của cộng đồng đối với mã cổ phiếu này.
+• "recommendation" (Khuyến nghị Chiến lược Đầu tư):
    - "action": "MUA" | "BÁN" | "NẮM GIỮ" | "THEO DÕI"
    - "details": Chiến lược giải ngân cụ thể (vùng giá mua gom tối ưu, vùng chốt lời từng phần, ngưỡng cắt lỗ Stop-loss kỷ luật và phân bổ tỷ trọng vốn hợp lý).
 
