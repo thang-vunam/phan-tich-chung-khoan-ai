@@ -141,7 +141,7 @@ export function markdownToHtml(rawInput: any): string {
         // Italic: *text*
         escapedText = escapedText.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
         // Convert "Lead-in Title:" to bold if it matches format "Title:"
-        escapedText = escapedText.replace(/^([A-Za-zÀ-ỹ0-9\s()&/-]+:)\s+/g, '<strong class="text-cyan-300 font-semibold">$1</strong> ');
+        escapedText = escapedText.replace(/^([A-Za-zÀ-ỹ0-9\s()&/-]+:)\s+/g, '<strong class="text-gray-100 font-semibold">$1</strong> ');
         return escapedText.replace(/__LINK_(\d+)__/g, (match, index) => links[parseInt(index, 10)]);
     };
 
@@ -199,7 +199,7 @@ export function markdownToHtml(rawInput: any): string {
             closeList();
             sectionCounter++;
             const titleContent = numberedHeaderMatch[2].replace(/^(\d+)[\.\)]\s*/, '').trim();
-            outputHtml.push(`<h4 class="text-base font-bold text-cyan-300 mt-4 mb-2 flex items-start gap-1.5"><span class="text-cyan-400 font-bold flex-shrink-0">${sectionCounter}.</span> <span>${styleInline(titleContent)}</span></h4>`);
+            outputHtml.push(`<h4 class="text-base font-semibold text-gray-100 mt-4 mb-2 flex items-start gap-1.5"><span class="text-gray-100 font-semibold flex-shrink-0">${sectionCounter}.</span> <span>${styleInline(titleContent)}</span></h4>`);
             continue;
         }
 
