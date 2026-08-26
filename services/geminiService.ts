@@ -692,9 +692,13 @@ YÊU CẦU ĐỊNH GIÁ & MỤC TIÊU GIÁ:
 - Các mức giá mục tiêu trong "targetPrices" (shortTerm, midTerm, longTerm): ${targetPriceRule}.
 - Phải có tỷ lệ phần trăm kỳ vọng (+X%) và luận điểm ngắn gọn, thuyết phục trong "label".
 
-YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC ĐẦY ĐỦ, ĐÀO SÂU, CÓ SỐ LIỆU VÀ GÓC NHÌN ĐA CHIỀU):
-• "macro" (Phân tích Vĩ mô & Vi mô): Gồm 2-3 tiểu mục (đánh số 1, 2, 3) phân tích tác động của mặt bằng lãi suất, điều hành chính sách tiền tệ của NHNN, tỷ giá USD/VND, lạm phát và các chính sách hỗ trợ ngành tới hoạt động kinh doanh của doanh nghiệp.
-• "industry" (Phân tích Ngành): Gồm 2-3 tiểu mục (đánh số 1, 2, 3) phân tích chu kỳ ngành, vị thế thị phần của doanh nghiệp so với các đối thủ cùng ngành, biên lợi nhuận toàn ngành, triển vọng tiêu thụ và các yếu tố xúc tác (catalysts) mới của ngành.
+YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC SẮC BÉN, THỰC TẾ, CÓ SỐ LIỆU, TUYỆT ĐỐI CẤM VĂN MẪU LÝ THUYẾT CHUNG CHUNG):
+• "macro" (Phân tích Vĩ mô & Vi mô Tác động Trực tiếp): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
+   - TUYỆT ĐỐI CẤM văn mẫu lý thuyết sách giáo khoa (như "nếu lạm phát tăng...", "chính sách linh hoạt tạo điều kiện...").
+   - PHẢI phân tích cụ thể: Môi trường lãi suất điều hành/cho vay thực tế của NHNN, tỷ giá USD/VND, diễn biến giá hàng hóa/nguyên liệu thế giới liên quan trực tiếp đến mặt hàng của doanh nghiệp, sức mua tiêu dùng nội địa (CPI, tổng mức bán lẻ) và chính sách thuế/tài khóa của Chính phủ tác động trực diện đến chi phí vốn, giá vốn và doanh thu của doanh nghiệp như thế nào.
+• "industry" (Phân tích Cấu trúc Ngành & Cạnh tranh Đối đầu): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
+   - TUYỆT ĐỐI CẤM nhận định chung chung về tiềm năng ngành.
+   - PHẢI nêu rõ: Xu hướng chuyển dịch chuỗi giá trị và cơ cấu tiêu dùng của ngành, vị thế thị phần của "${tickerSymbol}" so sánh trực diện với các đối thủ đầu ngành (nêu đích danh tên các đối thủ cạnh tranh chính trong ngành), lợi thế hào kinh tế (moat) vượt trội của doanh nghiệp và các chính sách quản lý nhà nước/nghị định mới đang tác động tái định hình cục diện ngành.
 • "fundamental" (Phân tích Cơ bản Doanh nghiệp): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
    - CẬP NHẬT KẾT QUẢ KINH DOANH MỚI NHẤT (BẮT BUỘC TRÍCH DẪN SỐ LIỆU XÁC THỰC Ở TRÊN): Nêu rõ Doanh thu thuần, LNST của các quý gần nhất (${realtimeInfo?.financialStatements?.quarters?.map(q => q.period).join(', ') || 'các quý mới nhất'}) và lũy kế đạt bao nhiêu tỷ đồng, biên lợi nhuận gộp bao nhiêu % theo đúng bảng số liệu BCTC được cấp.
    - BIÊN LỢI NHUẬN & HIỆU QUẢ HOẠT ĐỘNG: Phân tích chi tiết Biên lợi nhuận gộp thực tế, ROE, ROA, EPS.
