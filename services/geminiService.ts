@@ -927,19 +927,33 @@ const fetchStockComparisonInternal = async (ticker1: string, ticker2: string): P
     fetchRealtimeStockInfo(ticker2)
   ]);
 
+  const formatBctc = (info: any) => {
+    if (!info?.financialStatements?.quarters?.length) return '';
+    return `BẢNG BCTC XÁC THỰC (${info.ticker}):\n` + info.financialStatements.quarters.map((q: any) => 
+      `- [${q.period}]: Doanh thu = ${q.formattedRevenue} | LNST = ${q.formattedNetProfit} | Biên LN gộp = ${q.grossMargin}% | D/E = ${q.debtToEquity !== undefined ? q.debtToEquity + 'x' : 'N/A'}`
+    ).join('\n');
+  };
+
+  const bctc1Context = formatBctc(realtime1);
+  const bctc2Context = formatBctc(realtime2);
+
   return await executeWithKeyFallback(async (ai) => {
     const systemInstruction = `Bạn là chuyên gia so sánh đối đầu cổ phiếu chứng khoán Việt Nam hàng đầu. Trả lời bằng tiếng Việt và BẮT BUỘC trả về đúng cấu trúc JSON trong khối \`\`\`json ... \`\`\`.`;
     const formattedDate = getCurrentDateString();
     const prompt = `So sánh chuyên sâu và súc tích 2 cổ phiếu: "${ticker1}" và "${ticker2}" tính đến ngày ${formattedDate}.
-DỮ LIỆU THỊ TRƯỜNG THỰC TẾ HÔM NAY:
+DỮ LIỆU THỊ TRƯỜNG & BÁO CÁO TÀI CHÍNH THỰC TẾ HÔM NAY:
 - Mã ${ticker1}: Giá đóng cửa thực tế ${realtime1?.formattedPrice || 'Giá thị trường'}${realtime1?.volume ? ` (KL: ${realtime1.volume.toLocaleString('vi-VN')} cp, Biên độ: ${realtime1.low?.toLocaleString('vi-VN')} - ${realtime1.high?.toLocaleString('vi-VN')} VND)` : ''}.
+${bctc1Context}
+
 - Mã ${ticker2}: Giá đóng cửa thực tế ${realtime2?.formattedPrice || 'Giá thị trường'}${realtime2?.volume ? ` (KL: ${realtime2.volume.toLocaleString('vi-VN')} cp, Biên độ: ${realtime2.low?.toLocaleString('vi-VN')} - ${realtime2.high?.toLocaleString('vi-VN')} VND)` : ''}.
+${bctc2Context}
 
 Trình bày ngắn gọn, gạch đầu dòng rõ ràng.
 QUY TẮC BẮT BUỘC:
 1. Trường "closingPrice" của ${ticker1} PHẢI LÀ "${realtime1?.formattedPrice || 'Giá thị trường'}".
 2. Trường "closingPrice" của ${ticker2} PHẢI LÀ "${realtime2?.formattedPrice || 'Giá thị trường'}".
-3. Toàn bộ mức giá mục tiêu trong "targetPrices" của cả 2 mã BẮT BUỘC phải được tính toán dựa trên mức giá thực tế này.
+3. Phần "fundamental" BẮT BUỘC trích dẫn chính xác các con số doanh thu, LNST, biên lãi trong Bảng BCTC thực tế được cung cấp ở trên của cả 2 mã.
+4. Toàn bộ mức giá mục tiêu trong "targetPrices" của cả 2 mã BẮT BUỘC phải được tính toán dựa trên mức giá thực tế này.
 
 YÊU CẦU TIN TỨC: CHỈ lấy 5-7 tin tức TRỰC TIẾP đề cập đến "${ticker1}" hoặc "${ticker2}" trong 7 ngày gần đây. Nếu không tìm thấy, trả về "news": [].
 
@@ -952,7 +966,7 @@ BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
     "analysis": {
       "macro": "markdown phân tích vĩ mô tác động tới ${ticker1}",
       "industry": "markdown phân tích ngành và vị thế của ${ticker1}",
-      "fundamental": "markdown phân tích cơ bản, P/E, P/B, EPS của ${ticker1}",
+      "fundamental": "markdown phân tích cơ bản trích dẫn số liệu BCTC thật của ${ticker1}",
       "technical": "markdown phân tích kỹ thuật, xu hướng, MA, RSI của ${ticker1}",
       "recommendation": {
         "action": "MUA hoặc BÁN hoặc NẮM GIỮ",
@@ -975,7 +989,7 @@ BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
     "analysis": {
       "macro": "markdown phân tích vĩ mô tác động tới ${ticker2}",
       "industry": "markdown phân tích ngành và vị thế của ${ticker2}",
-      "fundamental": "markdown phân tích cơ bản, P/E, P/B, EPS của ${ticker2}",
+      "fundamental": "markdown phân tích cơ bản trích dẫn số liệu BCTC thật của ${ticker2}",
       "technical": "markdown phân tích kỹ thuật, xu hướng, MA, RSI của ${ticker2}",
       "recommendation": {
         "action": "MUA hoặc BÁN hoặc NẮM GIỮ",
@@ -1030,13 +1044,13 @@ BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
             symbol,
             closingPrice: t?.closingPrice || 'Đang cập nhật',
             analysis: {
-                macro: markdownToHtml(t?.analysis?.macro),
-                industry: markdownToHtml(t?.analysis?.industry),
-                fundamental: markdownToHtml(t?.analysis?.fundamental),
-                technical: markdownToHtml(t?.analysis?.technical),
+                macro: markdownToHtml(formatToMarkdownString(t?.analysis?.macro)),
+                industry: markdownToHtml(formatToMarkdownString(t?.analysis?.industry)),
+                fundamental: markdownToHtml(formatToMarkdownString(t?.analysis?.fundamental)),
+                technical: markdownToHtml(formatToMarkdownString(t?.analysis?.technical)),
                 recommendation: {
                     action: recAction,
-                    details: markdownToHtml(recDetails),
+                    details: markdownToHtml(formatToMarkdownString(recDetails)),
                 },
                 targetPrices: {
                     shortTerm: {
@@ -1055,7 +1069,7 @@ BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
             },
             stockSentiment: {
                 score: typeof t?.stockSentiment?.score === 'number' ? t.stockSentiment.score : 50,
-                summary: markdownToHtml(t?.stockSentiment?.summary || `Tâm lý giao dịch mã ${symbol} ở mức trung tính.`),
+                summary: markdownToHtml(formatToMarkdownString(t?.stockSentiment?.summary || `Tâm lý giao dịch mã ${symbol} ở mức trung tính.`)),
             },
         };
     };
@@ -1068,9 +1082,9 @@ BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
             overallWinner: parsedData.comparativeSummary?.overallWinner || ticker1,
             fundamentalWinner: parsedData.comparativeSummary?.fundamentalWinner || ticker1,
             technicalWinner: parsedData.comparativeSummary?.technicalWinner || ticker2,
-            summaryText: markdownToHtml(parsedData.comparativeSummary?.summaryText || 'Đang cập nhật tổng kết đối đầu.'),
+            summaryText: markdownToHtml(formatToMarkdownString(parsedData.comparativeSummary?.summaryText || 'Đang cập nhật tổng kết đối đầu.')),
         },
-        forumSentiment: markdownToHtml(parsedData.forumSentiment),
+        forumSentiment: markdownToHtml(formatToMarkdownString(parsedData.forumSentiment)),
         news: normalizeNewsList(parsedData.news, groundingSources, `${ticker1} vs ${ticker2}`),
         groundingSources
     };
@@ -1269,20 +1283,20 @@ const fetchIndexAnalysisInternal = async (indexSymbol: string): Promise<{ result
 
     const finalResult: AnalysisResult = {
       ...parsedData,
-      macro: markdownToHtml(parsedData.macro),
-      industry: markdownToHtml(parsedData.industry),
-      fundamental: markdownToHtml(parsedData.fundamental),
-      technical: markdownToHtml(parsedData.technical),
-      forumSentiment: markdownToHtml(parsedData.forumSentiment),
+      macro: markdownToHtml(formatToMarkdownString(parsedData.macro)),
+      industry: markdownToHtml(formatToMarkdownString(parsedData.industry)),
+      fundamental: markdownToHtml(formatToMarkdownString(parsedData.fundamental)),
+      technical: markdownToHtml(formatToMarkdownString(parsedData.technical)),
+      forumSentiment: markdownToHtml(formatToMarkdownString(parsedData.forumSentiment)),
       marketSentiment: { 
         ...parsedData.marketSentiment, 
-        summary: markdownToHtml(parsedData.marketSentiment?.summary),
+        summary: markdownToHtml(formatToMarkdownString(parsedData.marketSentiment?.summary)),
         vnIndexTrend: stripCitations(parsedData.marketSentiment?.vnIndexTrend),
         foreignInvestors: stripCitations(parsedData.marketSentiment?.foreignInvestors),
         liquidity: stripCitations(parsedData.marketSentiment?.liquidity),
       },
-      stockSentiment: { ...parsedData.stockSentiment, summary: markdownToHtml(parsedData.stockSentiment?.summary) },
-      recommendation: { ...parsedData.recommendation, details: markdownToHtml(parsedData.recommendation?.details) },
+      stockSentiment: { ...parsedData.stockSentiment, summary: markdownToHtml(formatToMarkdownString(parsedData.stockSentiment?.summary)) },
+      recommendation: { ...parsedData.recommendation, details: markdownToHtml(formatToMarkdownString(parsedData.recommendation?.details)) },
       news: normalizeNewsList(parsedData.news, groundingSources, indexSymbol),
       groundingSources
     };
