@@ -264,6 +264,13 @@ export default async function handler(req: any, res: any) {
         trendDescription = `đang dao động tích lũy trong biên độ ${lowest.toFixed(2)} - ${highest.toFixed(2)} điểm`;
       }
 
+      const sampleVol = dailyData.v ? dailyData.v.slice(-20) : [];
+      const avgVol20 = sampleVol.length > 0 ? (sampleVol.reduce((a: number, b: number) => a + (b || 0), 0) / sampleVol.length) : 0;
+      const estTurnover = Math.round((avgVol20 * 23000) / 1e9);
+      const liquidityDescription = avgVol20 > 0 
+        ? `khớp lệnh bình quân 20 phiên đạt ~${Math.round(avgVol20 / 1e6)} triệu cp/phiên (tương đương ~${estTurnover.toLocaleString('vi-VN')} tỷ đồng/phiên)`
+        : undefined;
+
       return {
         name,
         points: Number(current.toFixed(2)),
@@ -273,6 +280,9 @@ export default async function handler(req: any, res: any) {
         pctFromHigh: Number(pctFromHigh.toFixed(2)),
         pctFromLow: Number(pctFromLow.toFixed(2)),
         volume: dailyData.v ? dailyData.v[count - 1] : undefined,
+        avgVolume20: Math.round(avgVol20),
+        estimatedTurnover20: estTurnover,
+        liquidityDescription,
         trendDescription
       };
     };

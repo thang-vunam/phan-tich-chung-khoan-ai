@@ -1094,6 +1094,9 @@ BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
 };
 
 const fetchIndustryAnalysisInternal = async (industryInput: string): Promise<{ result: IndustryAnalysisResult, chat: Chat }> => {
+  const vnIndexInfo = await fetchRealtimeStockInfo('VNINDEX').catch(() => null);
+  const dynamicLiquidity = vnIndexInfo?.vnIndex?.liquidityDescription || 'khớp lệnh bình quân 20 phiên gần nhất trên các sàn HOSE/HNX';
+
   return await executeWithKeyFallback(async (ai) => {
     const systemInstruction = `Bạn là Giám đốc Phân tích Đầu tư Ngành Chứng khoán Cao cấp tại Việt Nam. Trình bày sắc bén, chuẩn xác số liệu thực tế, đi thẳng vào luận điểm cốt lõi. Trả lời bằng tiếng Việt và BẮT BUỘC trả về JSON trong khối \`\`\`json ... \`\`\`.`;
     const formattedDate = getCurrentDateString();
@@ -1101,13 +1104,13 @@ const fetchIndustryAnalysisInternal = async (industryInput: string): Promise<{ r
     const prompt = `Phân tích chuyên sâu, sắc bén và toàn diện về ngành "${industryInput}" tại thị trường chứng khoán Việt Nam tính đến ngày ${formattedDate}.
 
 BỐI CẢNH THỊ TRƯỜNG THỰC TẾ:
-- Thanh khoản thị trường thực tế: Khớp lệnh bình quân toàn thị trường dao động quanh mức 15.000 - 20.000 tỷ VND/phiên.
+- Thanh khoản thị trường thực tế (Tính toán động 20 phiên gần nhất từ sàn giao dịch): ${dynamicLiquidity}.
 - Động thái Khối ngoại thực tế: Đang duy trì trạng thái BÁN RÒNG, tạo áp lực cơ cấu danh mục lên các cổ phiếu vốn hóa lớn.
 - Động lực chung: Triển vọng vận hành hệ thống KRX, tháo gỡ nút thắt Non-pre-funding để nâng hạng thị trường FTSE/MSCI và các chính sách thúc đẩy kinh tế.
 
 QUY TẮC BẮT BUỘC VỀ BỐI CẢNH THỊ TRƯỜNG:
 - Trường "foreignInvestors": BẮT BUỘC phản ánh đúng xu hướng thực tế là "Bán ròng" hoặc "Chịu áp lực bán ròng". TUYỆT ĐỐI KHÔNG ghi mua ròng!
-- Trường "liquidity": BẮT BUỘC ghi đúng thanh khoản thực tế 15.000 - 20.000 tỷ đồng/phiên.
+- Trường "liquidity": BẮT BUỘC phản ánh theo dữ liệu thanh khoản thực tế: "${dynamicLiquidity}".
 
 YÊU CẦU CỔ PHIẾU NỔI BẬT: BẮT BUỘC chọn lọc từ 3 đến 4 cổ phiếu đầu ngành/dẫn dắt tiêu biểu nhất (ví dụ ngành Chứng khoán: SSI, VND, HCM, VCI; Thép: HPG, HSG, NKG; Ngân hàng: VCB, TCB, MBB, ACB; Bất động sản: VHM, KDH, NLG; Bán lẻ: MWG, FRT, PNJ...).
 YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP nói về ngành "${industryInput}" hoặc các doanh nghiệp lớn trong ngành trong 7 ngày gần đây. Nếu không tìm thấy, trả về "news": [].
@@ -1121,7 +1124,7 @@ Trả về JSON cấu trúc:
     "summary": "markdown phân tích súc tích tác động bối cảnh thị trường tới ngành", 
     "vnIndexTrend": "string xu hướng thị trường", 
     "foreignInvestors": "Bán ròng (hoặc chi tiết áp lực bán ròng)", 
-    "liquidity": "15.000 - 20.000 tỷ đồng/phiên" 
+    "liquidity": "${dynamicLiquidity}" 
   },
   "overview": "markdown phân tích tổng quan cấu trúc, quy mô và chu kỳ ngành",
   "opportunities": "markdown chi tiết các cơ hội & động lực tăng trưởng cốt lõi",
