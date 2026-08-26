@@ -692,13 +692,17 @@ YÊU CẦU ĐỊNH GIÁ & MỤC TIÊU GIÁ:
 - Các mức giá mục tiêu trong "targetPrices" (shortTerm, midTerm, longTerm): ${targetPriceRule}.
 - Phải có tỷ lệ phần trăm kỳ vọng (+X%) và luận điểm ngắn gọn, thuyết phục trong "label".
 
-YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC SẮC BÉN, THỰC TẾ, CÓ SỐ LIỆU, TUYỆT ĐỐI CẤM VĂN MẪU LÝ THUYẾT CHUNG CHUNG):
+YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC SẮC BÉN, CÓ CON SỐ LIỆU ĐỊNH LƯỢNG THỰC TẾ, TUYỆT ĐỐI CẤM VĂN MẪU LÝ THUYẾT CHUNG CHUNG):
 • "macro" (Phân tích Vĩ mô & Vi mô Tác động Trực tiếp): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
-   - TUYỆT ĐỐI CẤM văn mẫu lý thuyết sách giáo khoa (như "nếu lạm phát tăng...", "chính sách linh hoạt tạo điều kiện...").
-   - PHẢI phân tích cụ thể: Môi trường lãi suất điều hành/cho vay thực tế của NHNN, tỷ giá USD/VND, diễn biến giá hàng hóa/nguyên liệu thế giới liên quan trực tiếp đến mặt hàng của doanh nghiệp, sức mua tiêu dùng nội địa (CPI, tổng mức bán lẻ) và chính sách thuế/tài khóa của Chính phủ tác động trực diện đến chi phí vốn, giá vốn và doanh thu của doanh nghiệp như thế nào.
+   - BẮT BUỘC PHẢI ĐƯA RA CÁC CON SỐ LIỆU ĐỊNH LƯỢNG VĨ MÔ THỰC TẾ (TUYỆT ĐỐI CẤM văn mẫu lý thuyết như "nếu lạm phát tăng...", "chính sách linh hoạt...").
+   - 1. Môi trường Tiền tệ & Lãi suất: Nêu con số mặt bằng lãi suất huy động (~5.0% - 5.8%/năm), lãi suất cho vay (~8.0% - 9.5%/năm) của các NHTM, tác động trực tiếp đến chi phí tài chính và khả năng tiếp cận vốn của doanh nghiệp.
+   - 2. Tỷ giá & Hàng hóa Nguyên liệu: Nêu con số tỷ giá USD/VND thực tế (quanh mốc 25.400 - 25.500 VND/USD, biến động ~+4% YTD) và diễn biến giá hàng hóa/nguyên liệu thế giới liên quan trực tiếp đến ngành (ví dụ: giá vàng thế giới USD/oz & vàng trong nước triệu đ/lượng, giá quặng sắt USD/tấn, giá dầu Brent USD/thùng...) tác động đến giá vốn và biên lãi.
+   - 3. Lạm phát & Sức mua Tiêu dùng: Nêu con số lạm phát CPI thực tế (~3.8% - 4.0%), tăng trưởng tổng mức bán lẻ tiêu dùng (+8.5% - 9.2% YoY), tác động từ chính sách giảm thuế VAT 2% hoặc đẩy mạnh đầu tư công đến sức cầu sản phẩm của doanh nghiệp.
 • "industry" (Phân tích Cấu trúc Ngành & Cạnh tranh Đối đầu): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
-   - TUYỆT ĐỐI CẤM nhận định chung chung về tiềm năng ngành.
-   - PHẢI nêu rõ: Xu hướng chuyển dịch chuỗi giá trị và cơ cấu tiêu dùng của ngành, vị thế thị phần của "${tickerSymbol}" so sánh trực diện với các đối thủ đầu ngành (nêu đích danh tên các đối thủ cạnh tranh chính trong ngành), lợi thế hào kinh tế (moat) vượt trội của doanh nghiệp và các chính sách quản lý nhà nước/nghị định mới đang tác động tái định hình cục diện ngành.
+   - BẮT BUỘC NÊU RÕ CON SỐ THỊ PHẦN, QUY MÔ VÀ ĐỐI THỦ CẠNH TRANH:
+   - 1. Cấu trúc & Xu hướng Chuyển dịch Ngành: Nêu quy mô thị trường, tốc độ tăng trưởng ngành và xu hướng chuyển dịch chuỗi giá trị (từ mô hình truyền thống/nhỏ lẻ sang chuỗi bán lẻ hiện đại có thương hiệu).
+   - 2. Vị thế Thị phần & So sánh Trực diện Đối thủ: Nêu rõ ước tính % thị phần của "${tickerSymbol}", quy mô điểm bán/cửa hàng/công suất so sánh trực diện với các đối thủ chính (nêu đích danh tên các đối thủ lớn như DOJI, SJC, Bảo Tín Minh Châu đối với PNJ; Hoa Sen, Nam Kim đối với HPG; VPS, VNDirect, TCBS đối với SSI...).
+   - 3. Bóc tách Biên Lợi nhuận & Xúc tác Ngành: Bóc tách biên lợi nhuận giữa các mảng kinh doanh cốt lõi và các chính sách quản lý nhà nước (nghị định, quy định mới) đang định hình lại ngành.
 • "fundamental" (Phân tích Cơ bản Doanh nghiệp): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
    - CẬP NHẬT KẾT QUẢ KINH DOANH MỚI NHẤT (BẮT BUỘC TRÍCH DẪN SỐ LIỆU XÁC THỰC Ở TRÊN): Nêu rõ Doanh thu thuần, LNST của các quý gần nhất (${realtimeInfo?.financialStatements?.quarters?.map(q => q.period).join(', ') || 'các quý mới nhất'}) và lũy kế đạt bao nhiêu tỷ đồng, biên lợi nhuận gộp bao nhiêu % theo đúng bảng số liệu BCTC được cấp.
    - BIÊN LỢI NHUẬN & HIỆU QUẢ HOẠT ĐỘNG: Phân tích chi tiết Biên lợi nhuận gộp thực tế, ROE, ROA, EPS.
