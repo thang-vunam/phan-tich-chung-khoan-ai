@@ -3,7 +3,7 @@ import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import type { AnalysisResult, ComparisonResult, GroundingSource, MarketSentiment, IndustryAnalysisResult, NewsItem } from '../types';
 
 const PRO_MODEL = 'gemini-2.5-flash';
-const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-3.6-flash'];
+const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash'];
 
 const extractGroundingSources = (response: GenerateContentResponse): GroundingSource[] => {
     const sources: GroundingSource[] = [];
@@ -836,17 +836,21 @@ const sendChatWithToolFallback = async (
 
   for (const modelName of FALLBACK_MODELS) {
     try {
+      const config: any = {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json',
+        systemInstruction,
+      };
+
+      // Chỉ thêm thinkingConfig cho gemini-2.5-flash (tránh lỗi 400 INVALID_ARGUMENT ở các model khác)
+      if (modelName === 'gemini-2.5-flash') {
+        config.thinkingConfig = { thinkingBudget: 0 };
+      }
+
       const chat = ai.chats.create({
         model: modelName,
-        config: {
-          temperature: 0.1,
-          maxOutputTokens: 8192,
-          responseMimeType: 'application/json',
-          systemInstruction,
-          thinkingConfig: {
-            thinkingBudget: 0
-          }
-        },
+        config,
       });
       const response = await chat.sendMessage({ message });
       
@@ -893,11 +897,11 @@ const fetchStockAnalysisInternal = async (tickerSymbol: string, customPrice?: st
     const finalResult: AnalysisResult = {
       ...parsedData,
       closingPrice: customPrice ? `${customPrice} VND` : (realtimeInfo?.formattedPrice || parsedData.closingPrice),
-      macro: markdownToHtml(parsedData.macro),
-      industry: markdownToHtml(parsedData.industry),
-      fundamental: markdownToHtml(parsedData.fundamental),
-      technical: markdownToHtml(parsedData.technical),
-      forumSentiment: markdownToHtml(parsedData.forumSentiment),
+      macro: markdownToHtml(formatToMarkdownString(parsedData.macro)),
+      industry: markdownToHtml(formatToMarkdownString(parsedData.industry)),
+      fundamental: markdownToHtml(formatToMarkdownString(parsedData.fundamental)),
+      technical: markdownToHtml(formatToMarkdownString(parsedData.technical)),
+      forumSentiment: markdownToHtml(formatToMarkdownString(parsedData.forumSentiment)),
       marketSentiment: { 
         ...parsedData.marketSentiment, 
         summary: markdownToHtml(parsedData.marketSentiment?.summary),
