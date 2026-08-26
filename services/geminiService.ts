@@ -843,6 +843,9 @@ const sendChatWithToolFallback = async (
           maxOutputTokens: 8192,
           responseMimeType: 'application/json',
           systemInstruction,
+          thinkingConfig: {
+            thinkingBudget: 0
+          }
         },
       });
       const response = await chat.sendMessage({ message });
@@ -880,6 +883,10 @@ const fetchStockAnalysisInternal = async (tickerSymbol: string, customPrice?: st
     const parsedData = parseJsonResponse(response.text);
     if (parsedData.isValid === false || parsedData.error) {
       throw new Error(parsedData.error || `Mã cổ phiếu "${tickerSymbol}" không tồn tại trên thị trường chứng khoán Việt Nam. Vui lòng kiểm tra lại.`);
+    }
+
+    if (!parsedData.macro || !parsedData.industry || !parsedData.fundamental || !parsedData.technical) {
+      throw new Error(`Bản phân tích mã "${tickerSymbol}" chưa hoàn chỉnh. Đang tự động kết nối lại...`);
     }
     const groundingSources = extractGroundingSources(response);
 
