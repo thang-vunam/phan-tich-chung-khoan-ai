@@ -367,32 +367,38 @@ const repairTruncatedJson = (str: string): string => {
 const parseJsonResponse = (text: string) => {
     let cleanStr = text.trim();
 
-    // 1. Try markdown json block first
-    const match = cleanStr.match(/```json\s*([\s\S]*?)\s*```/i);
-    if (match) {
-        cleanStr = match[1].trim();
-    }
-
-    // 2. Extract strictly balanced top-level JSON { ... } to cut off any trailing notes/commentary
-    cleanStr = extractBalancedJson(cleanStr);
-
-    // 3. Try parsing directly
+    // 1. Try direct parse first (fastest and most reliable for responseMimeType: 'application/json')
     try {
         return JSON.parse(cleanStr);
-    } catch (e) {
-        // Fallback to sanitizing
+    } catch (e) {}
+
+    // 2. Try markdown json block
+    const match = cleanStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (match) {
+        try {
+            return JSON.parse(match[1].trim());
+        } catch (e) {
+            cleanStr = match[1].trim();
+        }
     }
 
-    // 4. Try sanitizing unescaped quotes and trailing commas
-    try {
-        const sanitized = sanitizeJsonString(cleanStr);
-        const cleanedCommas = sanitized.replace(/,(\s*[\]}])/g, '$1');
-        return JSON.parse(cleanedCommas);
-    } catch (err) {
-        // Fallback to auto-repairing truncated JSON
+    // 3. Extract strictly between first '{' and last '}'
+    const firstBrace = cleanStr.indexOf('{');
+    const lastBrace = cleanStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+        const sliced = cleanStr.substring(firstBrace, lastBrace + 1);
+        try {
+            return JSON.parse(sliced);
+        } catch (e) {
+            try {
+                // Remove trailing commas before } or ]
+                const noCommas = sliced.replace(/,(\s*[\]}])/g, '$1');
+                return JSON.parse(noCommas);
+            } catch (e2) {}
+        }
     }
 
-    // 5. Try auto-repairing truncated braces and quotes
+    // 4. Try sanitizing unescaped quotes and repairing truncated braces
     try {
         const repaired = repairTruncatedJson(cleanStr);
         const sanitized = sanitizeJsonString(repaired);
@@ -400,7 +406,7 @@ const parseJsonResponse = (text: string) => {
         return JSON.parse(cleanedCommas);
     } catch (err) {
         console.error("Failed to parse JSON even after repair. Original text preview:", text.substring(0, 500));
-        throw err;
+        throw new Error("Dữ liệu phân tích trả về gặp sự cố định dạng. Vui lòng bấm 'Phân tích' lại nhé!");
     }
 };
 
