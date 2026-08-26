@@ -1081,26 +1081,44 @@ BẮT BUỘC trả về JSON theo đúng cấu trúc sau:
 
 const fetchIndustryAnalysisInternal = async (industryInput: string): Promise<{ result: IndustryAnalysisResult, chat: Chat }> => {
   return await executeWithKeyFallback(async (ai) => {
-    const systemInstruction = `Bạn là chuyên gia phân tích ngành chứng khoán. Trình bày súc tích, đi thẳng vào số liệu và luận điểm chính. Trả lời bằng tiếng Việt và BẮT BUỘC trả về JSON trong khối \`\`\`json ... \`\`\`.`;
+    const systemInstruction = `Bạn là Giám đốc Phân tích Đầu tư Ngành Chứng khoán Cao cấp tại Việt Nam. Trình bày sắc bén, chuẩn xác số liệu thực tế, đi thẳng vào luận điểm cốt lõi. Trả lời bằng tiếng Việt và BẮT BUỘC trả về JSON trong khối \`\`\`json ... \`\`\`.`;
     const formattedDate = getCurrentDateString();
-    const prompt = `Phân tích súc tích ngành ${industryInput} tại Việt Nam tính đến ngày ${formattedDate}.
-YÊU CẦU CỔ PHIẾU NỔI BẬT: BẮT BUỘC chọn lọc từ 3 đến 5 cổ phiếu đầu ngành/dẫn dắt tiêu biểu nhất (ví dụ ngành Thép: HPG, HSG, NKG; Khu công nghiệp: VGC, KBC, IDC...).
-YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP nói về ngành "${industryInput}" hoặc các doanh nghiệp lớn trong ngành. Nếu không tìm thấy tin nào trong 7 ngày gần đây, trả về "news": [].
+    
+    const prompt = `Phân tích chuyên sâu, sắc bén và toàn diện về ngành "${industryInput}" tại thị trường chứng khoán Việt Nam tính đến ngày ${formattedDate}.
+
+BỐI CẢNH THỊ TRƯỜNG THỰC TẾ:
+- Thanh khoản thị trường thực tế: Khớp lệnh bình quân toàn thị trường dao động quanh mức 15.000 - 20.000 tỷ VND/phiên.
+- Động thái Khối ngoại thực tế: Đang duy trì trạng thái BÁN RÒNG, tạo áp lực cơ cấu danh mục lên các cổ phiếu vốn hóa lớn.
+- Động lực chung: Triển vọng vận hành hệ thống KRX, tháo gỡ nút thắt Non-pre-funding để nâng hạng thị trường FTSE/MSCI và các chính sách thúc đẩy kinh tế.
+
+QUY TẮC BẮT BUỘC VỀ BỐI CẢNH THỊ TRƯỜNG:
+- Trường "foreignInvestors": BẮT BUỘC phản ánh đúng xu hướng thực tế là "Bán ròng" hoặc "Chịu áp lực bán ròng". TUYỆT ĐỐI KHÔNG ghi mua ròng!
+- Trường "liquidity": BẮT BUỘC ghi đúng thanh khoản thực tế 15.000 - 20.000 tỷ đồng/phiên.
+
+YÊU CẦU CỔ PHIẾU NỔI BẬT: BẮT BUỘC chọn lọc từ 3 đến 4 cổ phiếu đầu ngành/dẫn dắt tiêu biểu nhất (ví dụ ngành Chứng khoán: SSI, VND, HCM, VCI; Thép: HPG, HSG, NKG; Ngân hàng: VCB, TCB, MBB, ACB; Bất động sản: VHM, KDH, NLG; Bán lẻ: MWG, FRT, PNJ...).
+YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP nói về ngành "${industryInput}" hoặc các doanh nghiệp lớn trong ngành trong 7 ngày gần đây. Nếu không tìm thấy, trả về "news": [].
+
 Trả về JSON cấu trúc:
 {
   "industryName": "${industryInput}",
   "assumedDate": "${formattedDate}",
-  "marketSentiment": { "score": 0-100, "summary": "markdown súc tích", "vnIndexTrend": "string", "foreignInvestors": "string", "liquidity": "string" },
-  "overview": "markdown phân tích tổng quan ngành súc tích",
-  "opportunities": "markdown chi tiết các cơ hội & động lực tăng trưởng",
-  "challenges": "markdown chi tiết các rủi ro & thách thức",
+  "marketSentiment": { 
+    "score": 0-100, 
+    "summary": "markdown phân tích súc tích tác động bối cảnh thị trường tới ngành", 
+    "vnIndexTrend": "string xu hướng thị trường", 
+    "foreignInvestors": "Bán ròng (hoặc chi tiết áp lực bán ròng)", 
+    "liquidity": "15.000 - 20.000 tỷ đồng/phiên" 
+  },
+  "overview": "markdown phân tích tổng quan cấu trúc, quy mô và chu kỳ ngành",
+  "opportunities": "markdown chi tiết các cơ hội & động lực tăng trưởng cốt lõi",
+  "challenges": "markdown chi tiết các rủi ro, áp lực cạnh tranh & thách thức chính sách",
   "topStocks": [
-    { "symbol": "Mã CP 1", "companyName": "Tên DN", "price": "Giá", "highlights": "Điểm nhấn đầu tư súc tích", "recommendation": "MUA" },
-    { "symbol": "Mã CP 2", "companyName": "Tên DN", "price": "Giá", "highlights": "Điểm nhấn đầu tư súc tích", "recommendation": "MUA" },
-    { "symbol": "Mã CP 3", "companyName": "Tên DN", "price": "Giá", "highlights": "Điểm nhấn đầu tư súc tích", "recommendation": "THEO DÕI" }
+    { "symbol": "MÃ 1", "companyName": "Tên Công ty", "highlights": "Điểm nhấn đầu tư, thị phần và xúc tác tăng trưởng", "recommendation": "MUA" },
+    { "symbol": "MÃ 2", "companyName": "Tên Công ty", "highlights": "Điểm nhấn đầu tư, thị phần và xúc tác tăng trưởng", "recommendation": "MUA" },
+    { "symbol": "MÃ 3", "companyName": "Tên Công ty", "highlights": "Điểm nhấn đầu tư, thị phần và xúc tác tăng trưởng", "recommendation": "THEO DÕI" }
   ],
   "news": [
-    { "title": "Tiêu đề tin trực tiếp về ngành ${industryInput}", "publisher": "VnEconomy", "time": "Hôm qua" }
+    { "title": "Tiêu đề tin tức ngành ${industryInput}", "publisher": "VnEconomy", "time": "Hôm qua" }
   ]
 }`;
 
@@ -1135,7 +1153,8 @@ Trả về JSON cấu trúc:
       'Chứng khoán': [
         { symbol: 'SSI', companyName: 'Chứng khoán SSI', price: 'Theo dõi thị giá', highlights: 'Thị phần hàng đầu, quy mô vốn chủ sở hữu lớn hưởng lợi trực tiếp từ KRX và nâng hạng.', recommendation: 'MUA' },
         { symbol: 'HCM', companyName: 'HSC', price: 'Theo dõi thị giá', highlights: 'Thế mạnh mảng khách hàng tổ chức nước ngoài và mảng cho vay ký quỹ (margin).', recommendation: 'MUA' },
-        { symbol: 'VCI', companyName: 'Vietcap', price: 'Theo dõi thị giá', highlights: 'Dẫn đầu mảng ngân hàng đầu tư (IB) với các thương vụ tư vấn M&A lớn.', recommendation: 'MUA' }
+        { symbol: 'VCI', companyName: 'Vietcap', price: 'Theo dõi thị giá', highlights: 'Dẫn đầu mảng ngân hàng đầu tư (IB) với các thương vụ tư vấn M&A lớn.', recommendation: 'MUA' },
+        { symbol: 'VND', companyName: 'VNDIRECT', price: 'Theo dõi thị giá', highlights: 'Hệ sinh thái số, tệp khách hàng cá nhân rộng lớn và mảng môi giới phát triển.', recommendation: 'THEO DÕI' }
       ],
       'Thép': [
         { symbol: 'HPG', companyName: 'Tập đoàn Hòa Phát', price: 'Theo dõi thị giá', highlights: 'Thị phần thép xây dựng số 1, dự án Dung Quất 2 là động lực tăng trưởng đột phá.', recommendation: 'MUA' },
@@ -1153,21 +1172,42 @@ Trả về JSON cấu trúc:
       industryInput.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(industryInput.toLowerCase())
     );
 
-    const finalStocksList = rawStocks.length > 0 ? rawStocks : (matchedDefault ? DEFAULT_SECTOR_STOCKS[matchedDefault] : []);
+    const baseStocksList = rawStocks.length > 0 ? rawStocks : (matchedDefault ? DEFAULT_SECTOR_STOCKS[matchedDefault] : []);
+
+    // Tự động truy vấn Giá Live Real-time thực tế cho từng mã cổ phiếu đầu ngành
+    const enrichedStocksList = await Promise.all(
+      baseStocksList.map(async (s: any) => {
+        const sym = (s.symbol || '').trim().toUpperCase();
+        let actualPriceStr = s.price;
+        if (sym) {
+          try {
+            const stockInfo = await fetchRealtimeStockInfo(sym);
+            if (stockInfo?.formattedPrice) {
+              actualPriceStr = stockInfo.formattedPrice;
+            }
+          } catch (e) {}
+        }
+        return {
+          ...s,
+          price: actualPriceStr || 'Theo dõi thị giá',
+          highlights: markdownToHtml(formatToMarkdownString(s.highlights))
+        };
+      })
+    );
 
     const finalResult: IndustryAnalysisResult = {
         ...parsedData,
-        overview: markdownToHtml(parsedData.overview),
-        opportunities: markdownToHtml(parsedData.opportunities),
-        challenges: markdownToHtml(parsedData.challenges),
+        overview: markdownToHtml(formatToMarkdownString(parsedData.overview)),
+        opportunities: markdownToHtml(formatToMarkdownString(parsedData.opportunities)),
+        challenges: markdownToHtml(formatToMarkdownString(parsedData.challenges)),
         marketSentiment: { 
           ...parsedData.marketSentiment, 
-          summary: markdownToHtml(parsedData.marketSentiment?.summary),
+          summary: markdownToHtml(formatToMarkdownString(parsedData.marketSentiment?.summary)),
           vnIndexTrend: stripCitations(parsedData.marketSentiment?.vnIndexTrend),
           foreignInvestors: stripCitations(parsedData.marketSentiment?.foreignInvestors),
           liquidity: stripCitations(parsedData.marketSentiment?.liquidity),
         },
-        topStocks: finalStocksList.map((s: any) => ({ ...s, highlights: markdownToHtml(s.highlights) })),
+        topStocks: enrichedStocksList,
         news: normalizeNewsList(parsedData.news, groundingSources, industryInput),
         groundingSources
     };
