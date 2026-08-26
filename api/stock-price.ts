@@ -86,6 +86,108 @@ async function fetchLatestStockNews(symbol: string): Promise<StockNewsItem[]> {
   }
 }
 
+export interface FinancialQuarter {
+  period: string;
+  revenue: number;
+  formattedRevenue: string;
+  grossProfit: number;
+  formattedGrossProfit: string;
+  grossMargin: number;
+  netProfit: number;
+  formattedNetProfit: string;
+  totalAssets?: number;
+  formattedTotalAssets?: string;
+  totalLiabilities?: number;
+  formattedTotalLiabilities?: string;
+  equity?: number;
+  formattedEquity?: string;
+  debtToEquity?: number;
+}
+
+export interface FinancialStatementsSummary {
+  industryGroup?: string;
+  quarters: FinancialQuarter[];
+  latestYearSummary?: {
+    totalRevenue: number;
+    formattedTotalRevenue: string;
+    totalNetProfit: number;
+    formattedTotalNetProfit: string;
+  };
+}
+
+async function fetchFinancialStatements(symbol: string): Promise<FinancialStatementsSummary | undefined> {
+  try {
+    const url = `https://api.simplize.vn/api/company/fi/ratio/${symbol}?period=Q&size=4`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+      }
+    });
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    if (!data || !data.data || !Array.isArray(data.data.items) || data.data.items.length === 0) {
+      return undefined;
+    }
+
+    const items = data.data.items;
+    const quarters: FinancialQuarter[] = [];
+
+    const fmtTỷ = (val: number) => `${(val / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tỷ VND`;
+
+    for (const item of items) {
+      const rev = item.is4 || item.is1 || 0;
+      const gp = item.is2 || 0;
+      const np = item.is3 !== undefined ? Math.abs(item.is3) : 0;
+      const grossMargin = rev > 0 ? Number(((gp / rev) * 100).toFixed(1)) : 0;
+
+      const assets = item.bs1 || 0;
+      const liab = item.bs6 || 0;
+      const eq = item.bs10 || 0;
+      const de = eq > 0 ? Number((liab / eq).toFixed(2)) : undefined;
+
+      quarters.push({
+        period: item.periodDateName || 'N/A',
+        revenue: rev,
+        formattedRevenue: fmtTỷ(rev),
+        grossProfit: gp,
+        formattedGrossProfit: fmtTỷ(gp),
+        grossMargin,
+        netProfit: np,
+        formattedNetProfit: fmtTỷ(np),
+        totalAssets: assets,
+        formattedTotalAssets: assets > 0 ? fmtTỷ(assets) : undefined,
+        totalLiabilities: liab,
+        formattedTotalLiabilities: liab > 0 ? fmtTỷ(liab) : undefined,
+        equity: eq,
+        formattedEquity: eq > 0 ? fmtTỷ(eq) : undefined,
+        debtToEquity: de
+      });
+    }
+
+    let totalRev = 0;
+    let totalNp = 0;
+    quarters.forEach(q => {
+      totalRev += q.revenue;
+      totalNp += q.netProfit;
+    });
+
+    return {
+      industryGroup: data.data.industryGroup,
+      quarters,
+      latestYearSummary: {
+        totalRevenue: totalRev,
+        formattedTotalRevenue: fmtTỷ(totalRev),
+        totalNetProfit: totalNp,
+        formattedTotalNetProfit: fmtTỷ(totalNp)
+      }
+    };
+  } catch (err) {
+    console.warn(`Could not fetch financial statements for ${symbol}:`, err);
+    return undefined;
+  }
+}
+
 export default async function handler(req: any, res: any) {
   const symbol = ((req.query.symbol as string) || '').trim().toUpperCase();
   if (!symbol) {
@@ -97,15 +199,16 @@ export default async function handler(req: any, res: any) {
   const fromDaily = now - 86400 * 30; // 30 ngày nến để tính đỉnh đáy và xu hướng động
 
   try {
-    // Chạy song song: Lấy giá Live 1-phút trong phiên + Nến ngày lịch sử + Nến 30 phiên của 3 sàn (HOSE, HNX, UPCOM) + Tin tức kép
-    const [stock1mRes, stock1dRes, vnIndex1mRes, vnIndex1dRes, hnxRes, upcomRes, newsItems] = await Promise.all([
+    // Chạy song song: Lấy giá Live 1-phút trong phiên + Nến ngày lịch sử + Nến 30 phiên của 3 sàn (HOSE, HNX, UPCOM) + Tin tức kép + BCTC Simplize
+    const [stock1mRes, stock1dRes, vnIndex1mRes, vnIndex1dRes, hnxRes, upcomRes, newsItems, financials] = await Promise.all([
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromIntraday}&to=${now}&symbol=${symbol}&resolution=1`).catch(() => null),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromDaily}&to=${now}&symbol=${symbol}&resolution=1D`).catch(() => null),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIntraday}&to=${now}&symbol=VNINDEX&resolution=1`).catch(() => null),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromDaily}&to=${now}&symbol=VNINDEX&resolution=1D`).catch(() => null),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromDaily}&to=${now}&symbol=HNX&resolution=1D`).catch(() => null),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromDaily}&to=${now}&symbol=UPCOM&resolution=1D`).catch(() => null),
-      fetchLatestStockNews(symbol)
+      fetchLatestStockNews(symbol),
+      fetchFinancialStatements(symbol)
     ]);
 
     const parseJson = async (resObj: any) => {
@@ -219,7 +322,8 @@ export default async function handler(req: any, res: any) {
       upcomIndex: upcomInfo,
       date: lastDateStr,
       source: isLiveSession ? 'Khớp lệnh Real-time sàn HOSE/HNX/UPCOM' : 'Dữ liệu giao dịch sàn HOSE/HNX/UPCOM',
-      news: newsItems
+      news: newsItems,
+      financialStatements: financials
     });
   } catch (err: any) {
     console.error(`API Error /api/stock-price:`, err);

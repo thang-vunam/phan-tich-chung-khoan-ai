@@ -447,6 +447,32 @@ export interface RealtimeStockInfo {
     trendDescription?: string;
   };
   source?: string;
+  financialStatements?: {
+    industryGroup?: string;
+    quarters: Array<{
+      period: string;
+      revenue: number;
+      formattedRevenue: string;
+      grossProfit: number;
+      formattedGrossProfit: string;
+      grossMargin: number;
+      netProfit: number;
+      formattedNetProfit: string;
+      totalAssets?: number;
+      formattedTotalAssets?: string;
+      totalLiabilities?: number;
+      formattedTotalLiabilities?: string;
+      equity?: number;
+      formattedEquity?: string;
+      debtToEquity?: number;
+    }>;
+    latestYearSummary?: {
+      totalRevenue: number;
+      formattedTotalRevenue: string;
+      totalNetProfit: number;
+      formattedTotalNetProfit: string;
+    };
+  };
   news?: Array<{
     title: string;
     url: string;
@@ -459,7 +485,7 @@ export interface RealtimeStockInfo {
 export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeStockInfo | null> => {
   const cleanTicker = ticker.trim().toUpperCase();
 
-  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Lấy Giá Live + Chỉ số & Xu hướng động 3 sàn + Tin tức 7 ngày gần nhất
+  // 1. Gọi qua Vercel Serverless Proxy (/api/stock-price) - Lấy Giá Live + Chỉ số & Xu hướng động 3 sàn + BCTC Simplize + Tin tức 7 ngày gần nhất
   try {
     const proxyRes = await fetch(`/api/stock-price?symbol=${cleanTicker}`);
     if (proxyRes.ok) {
@@ -613,6 +639,18 @@ ${realtimeInfo.news.map((n, i) => `${i + 1}. "${n.title}" (Nguồn: ${n.publishe
 BẮT BUỘC: Bạn PHẢI sử dụng và trích xuất các bài báo trong danh sách thực tế trên để điền vào trường "news".`
     : `YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP trong 7 ngày gần đây. Nếu không có tin trong 7 ngày, trả về "news": [].`;
 
+  const financialContext = (realtimeInfo?.financialStatements && realtimeInfo.financialStatements.quarters.length > 0)
+    ? `BẢNG SỐ LIỆU BÁO CÁO TÀI CHÍNH THỰC TẾ ĐÃ CÔNG BỐ (XÁC THỰC 100% TỪ BCTC DOANH NGHIỆP):
+${realtimeInfo.financialStatements.quarters.map(q => 
+`- [${q.period}]: Doanh thu thuần = ${q.formattedRevenue} | Lợi nhuận gộp = ${q.formattedGrossProfit} (Biên LN gộp: ${q.grossMargin}%) | Lợi nhuận sau thuế (LNST) = ${q.formattedNetProfit}${q.formattedTotalAssets ? ` | Tổng tài sản = ${q.formattedTotalAssets}` : ''}${q.debtToEquity !== undefined ? ` | Tỷ lệ D/E (Nợ/Vốn CSH) = ${q.debtToEquity}x` : ''}`
+).join('\n')}
+${realtimeInfo.financialStatements.latestYearSummary ? `- Lũy kế gần nhất: Tổng Doanh thu = ${realtimeInfo.financialStatements.latestYearSummary.formattedTotalRevenue}, Tổng LNST = ${realtimeInfo.financialStatements.latestYearSummary.formattedTotalNetProfit}` : ''}
+
+QUY TẮC BẮT BUỘC VỀ SỐ LIỆU TÀI CHÍNH TRONG "fundamental":
+- BẮT BUỘC SỬ DỤNG CHÍNH XÁC 100% CÁC CON SỐ DOANH THU, LỢI NHUẬN, BIÊN LÃI TRONG BẢNG SỐ LIỆU XÁC THỰC TRÊN.
+- TUYỆT ĐỐI KHÔNG TỰ SUY ĐOÁN, NGOẠI SUY HOẶC ĐƯA RA CÁC CON SỐ DOANH THU/LNST KHÁC VỚI BẢNG TRÊN!`
+    : '';
+
   return `Bạn là Giám đốc Phân tích Đầu tư Chứng khoán Cao cấp (Head of Equity Research) hàng đầu tại Việt Nam. Hãy lập BÁO CÁO PHÂN TÍCH CHUYÊN SÂU, TOÀN DIỆN VÀ SẮC BÉN về mã cổ phiếu "${tickerSymbol}".
 
 DỮ LIỆU THỊ TRƯỜNG THỰC TẾ TÍNH ĐẾN ${formattedDate}:
@@ -622,6 +660,8 @@ DỮ LIỆU THỊ TRƯỜNG THỰC TẾ TÍNH ĐẾN ${formattedDate}:
   * Sàn UPCOM (UPCOM-INDEX): ${upcomDetail}
 ${priceContext}
 Trường "assumedDate" phải là ${formattedDate}.
+
+${financialContext}
 
 ${newsContext}
 
@@ -650,12 +690,12 @@ YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC ĐẦY ĐỦ, Đ
 • "macro" (Phân tích Vĩ mô & Vi mô): Gồm 2-3 tiểu mục (đánh số 1, 2, 3) phân tích tác động của mặt bằng lãi suất, điều hành chính sách tiền tệ của NHNN, tỷ giá USD/VND, lạm phát và các chính sách hỗ trợ ngành tới hoạt động kinh doanh của doanh nghiệp.
 • "industry" (Phân tích Ngành): Gồm 2-3 tiểu mục (đánh số 1, 2, 3) phân tích chu kỳ ngành, vị thế thị phần của doanh nghiệp so với các đối thủ cùng ngành, biên lợi nhuận toàn ngành, triển vọng tiêu thụ và các yếu tố xúc tác (catalysts) mới của ngành.
 • "fundamental" (Phân tích Cơ bản Doanh nghiệp): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
-   - CẬP NHẬT KẾT QUẢ KINH DOANH MỚI NHẤT (BẮT BUỘC ĐỊNH LƯỢNG): Nêu rõ số liệu Doanh thu thuần, Lợi nhuận sau thuế (LNST) của các quý gần nhất (Quý 1, Quý 2 năm 2026 hoặc năm tài chính mới nhất) đạt bao nhiêu tỷ đồng, tăng trưởng bao nhiêu % so với cùng kỳ (YoY) hoặc so với quý trước.
-   - BIÊN LỢI NHUẬN & HIỆU QUẢ HOẠT ĐỘNG: Phân tích chi tiết Biên lợi nhuận gộp và Biên lợi nhuận ròng, ROE, ROA, EPS.
+   - CẬP NHẬT KẾT QUẢ KINH DOANH MỚI NHẤT (BẮT BUỘC TRÍCH DẪN SỐ LIỆU XÁC THỰC Ở TRÊN): Nêu rõ Doanh thu thuần, LNST của các quý gần nhất (${realtimeInfo?.financialStatements?.quarters?.map(q => q.period).join(', ') || 'các quý mới nhất'}) và lũy kế đạt bao nhiêu tỷ đồng, biên lợi nhuận gộp bao nhiêu % theo đúng bảng số liệu BCTC được cấp.
+   - BIÊN LỢI NHUẬN & HIỆU QUẢ HOẠT ĐỘNG: Phân tích chi tiết Biên lợi nhuận gộp thực tế, ROE, ROA, EPS.
    - ĐỊNH GIÁ: Định giá P/E, P/B hiện tại ở mức giá "${realtimeInfo?.formattedPrice || 'thị trường'}" so với trung bình ngành và định giá lịch sử.
-   - SỨC KHỎE TÀI CHÍNH: Tỷ lệ Nợ vay/Vốn chủ sở hữu (D/E), cơ cấu nợ, dòng tiền kinh doanh (CFO).
-   - ĐỘNG LỰC TĂNG TRƯỞNG & RỦI RO: Công suất, đơn hàng, mở rộng thị phần, rủi ro nguyên vật liệu/cạnh tranh.
-   - TUYỆT ĐỐI KHÔNG nhận định định tính chung chung (như "duy trì tốt", "ở mức kiểm soát") mà PHẢI đưa ra số liệu, tỷ lệ % hoặc phân tích nguyên nhân tài chính cụ thể.
+   - SỨC KHỎE TÀI CHÍNH: Tỷ lệ Nợ vay/Vốn chủ sở hữu (D/E), cơ cấu nợ, khả năng thanh toán.
+   - ĐỘNG LỰC TĂNG TRƯỞNG & RỦI RO: Đánh giá mảng kinh doanh đóng góp doanh thu lớn nhất, xúc tác tăng trưởng và các rủi ro hoạt động.
+   - TUYỆT ĐỐI KHÔNG nhận định định tính chung chung mà PHẢI gắn liền với các số liệu tài chính thực tế đã được cung cấp.
 • "technical" (Phân tích Kỹ thuật & Dòng tiền): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
    - Nhận định xu hướng giá ngắn hạn và trung hạn.
    - Chỉ rõ các ngưỡng HỖ TRỢ và KHÁNG CỰ then chốt (kèm mức giá cụ thể).
