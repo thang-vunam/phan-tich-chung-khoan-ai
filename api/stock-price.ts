@@ -158,21 +158,17 @@ async function fetchFinancialStatements(symbol: string): Promise<FinancialStatem
     const fmtTỷ = (val: number) => `${(val / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tỷ VND`;
 
     for (const item of items) {
-      // Phân biệt chính xác giữa Doanh nghiệp thương mại/sản xuất và Ngân hàng/Tổ chức tài chính
       const isBank = (item.bs7 !== undefined && item.bs7 > 0) || (item.is14 !== undefined && item.is14 > 0);
       
-      let rev = 0;
-      let np = 0;
+      // Doanh thu thuần chuẩn VAS (is1 hoặc is4)
+      const rev = item.is1 || item.is4 || 0;
+      
+      // Lợi nhuận sau thuế của Cổ đông Công ty Mẹ (giữ nguyên dấu âm/dương thực tế, tuyệt đối không dùng Math.abs)
+      const np = item.is14 !== undefined && item.is14 !== 0 
+        ? item.is14 
+        : (item.is50 !== undefined && item.is50 !== 0 ? item.is50 : (item.is3 || 0));
+
       const gp = item.is2 || 0;
-
-      if (isBank) {
-        rev = item.is1 || 0; // Thu nhập lãi thuần của Ngân hàng
-        np = item.is14 !== undefined ? Math.abs(item.is14) : (item.is3 !== undefined ? Math.abs(item.is3) : 0); // LNST ngân hàng
-      } else {
-        rev = item.is4 || item.is1 || 0; // Doanh thu thuần
-        np = item.is3 !== undefined ? Math.abs(item.is3) : 0; // LNST doanh nghiệp
-      }
-
       const grossMargin = rev > 0 ? Number(((gp / rev) * 100).toFixed(1)) : 0;
 
       const assets = item.bs1 || 0;
