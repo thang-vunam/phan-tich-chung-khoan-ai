@@ -104,6 +104,27 @@ export interface FinancialQuarter {
   debtToEquity?: number;
 }
 
+export interface ValuationMetrics {
+  isBank?: boolean;
+  ttmRevenue: number;
+  formattedTtmRevenue: string;
+  ttmNetProfit: number;
+  formattedTtmNetProfit: string;
+  sharesOutstanding: number;
+  eps: number;
+  formattedEps: string;
+  bvps: number;
+  formattedBvps: string;
+  roe: number;
+  roa: number;
+  pe?: number;
+  pb?: number;
+  nim?: number;
+  casa?: number;
+  npl?: number;
+  llr?: number;
+}
+
 export interface FinancialStatementsSummary {
   industryGroup?: string;
   quarters: FinancialQuarter[];
@@ -113,6 +134,7 @@ export interface FinancialStatementsSummary {
     totalNetProfit: number;
     formattedTotalNetProfit: string;
   };
+  valuationMetrics?: ValuationMetrics;
 }
 
 async function fetchFinancialStatements(symbol: string): Promise<FinancialStatementsSummary | undefined> {
@@ -184,6 +206,39 @@ async function fetchFinancialStatements(symbol: string): Promise<FinancialStatem
       totalNp += q.netProfit;
     });
 
+    const latestItem = items[0] || {};
+    const isBankLatest = (latestItem.bs7 !== undefined && latestItem.bs7 > 0) || (latestItem.is14 !== undefined && latestItem.is14 > 0);
+    const charterCap = latestItem.bs11 || (latestItem.op49 ? latestItem.op49 * 10000 : 0);
+    const sharesOutstanding = charterCap > 0 ? charterCap / 10000 : (latestItem.op49 || 1);
+    const equity = latestItem.bs10 || 1;
+    const totalAssets = latestItem.bs1 || 1;
+
+    const eps = Math.round(totalNp / sharesOutstanding);
+    const bvps = Math.round(equity / sharesOutstanding);
+    const roe = Number(((totalNp / equity) * 100).toFixed(1));
+    const roa = Number(((totalNp / totalAssets) * 100).toFixed(1));
+
+    const valuationMetrics = {
+      isBank: isBankLatest,
+      ttmRevenue: totalRev,
+      formattedTtmRevenue: fmtTỷ(totalRev),
+      ttmNetProfit: totalNp,
+      formattedTtmNetProfit: fmtTỷ(totalNp),
+      sharesOutstanding: Math.round(sharesOutstanding),
+      eps,
+      formattedEps: `${eps.toLocaleString('vi-VN')} VND/cp`,
+      bvps,
+      formattedBvps: `${bvps.toLocaleString('vi-VN')} VND/cp`,
+      roe,
+      roa,
+      pe: undefined as number | undefined,
+      pb: undefined as number | undefined,
+      nim: latestItem.op10 ? Number(latestItem.op10.toFixed(2)) : undefined,
+      casa: latestItem.op13 ? Number(latestItem.op13.toFixed(1)) : undefined,
+      npl: latestItem.op18 ? Number(latestItem.op18.toFixed(2)) : undefined,
+      llr: latestItem.op42 ? Number(latestItem.op42.toFixed(1)) : undefined
+    };
+
     return {
       industryGroup: data.data.industryGroup,
       quarters,
@@ -192,7 +247,8 @@ async function fetchFinancialStatements(symbol: string): Promise<FinancialStatem
         formattedTotalRevenue: fmtTỷ(totalRev),
         totalNetProfit: totalNp,
         formattedTotalNetProfit: fmtTỷ(totalNp)
-      }
+      },
+      valuationMetrics
     };
   } catch (err) {
     console.warn(`Could not fetch financial statements for ${symbol}:`, err);
@@ -330,6 +386,14 @@ export default async function handler(req: any, res: any) {
     }
 
     const priceVND = Math.round(lastClose * 1000);
+
+    // Tính P/E và P/B theo giá thị trường thực tế
+    if (financials && financials.valuationMetrics && priceVND > 0) {
+      const eps = financials.valuationMetrics.eps;
+      const bvps = financials.valuationMetrics.bvps;
+      if (eps > 0) financials.valuationMetrics.pe = Number((priceVND / eps).toFixed(1));
+      if (bvps > 0) financials.valuationMetrics.pb = Number((priceVND / bvps).toFixed(2));
+    }
 
     return res.status(200).json({
       ticker: symbol,

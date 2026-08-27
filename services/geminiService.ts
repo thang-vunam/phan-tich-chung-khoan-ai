@@ -478,6 +478,26 @@ export interface RealtimeStockInfo {
       totalNetProfit: number;
       formattedTotalNetProfit: string;
     };
+    valuationMetrics?: {
+      isBank?: boolean;
+      ttmRevenue: number;
+      formattedTtmRevenue: string;
+      ttmNetProfit: number;
+      formattedTtmNetProfit: string;
+      sharesOutstanding: number;
+      eps: number;
+      formattedEps: string;
+      bvps: number;
+      formattedBvps: string;
+      roe: number;
+      roa: number;
+      pe?: number;
+      pb?: number;
+      nim?: number;
+      casa?: number;
+      npl?: number;
+      llr?: number;
+    };
   };
   news?: Array<{
     title: string;
@@ -645,15 +665,30 @@ ${realtimeInfo.news.map((n, i) => `${i + 1}. "${n.title}" (Nguồn: ${n.publishe
 BẮT BUỘC: Bạn PHẢI sử dụng và trích xuất các bài báo trong danh sách thực tế trên để điền vào trường "news".`
     : `YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP trong 7 ngày gần đây. Nếu không có tin trong 7 ngày, trả về "news": [].`;
 
+  const vm = realtimeInfo?.financialStatements?.valuationMetrics;
+  const valuationContext = vm ? `
+BẢNG CHỈ SỐ ĐỊNH GIÁ & HIỆU QUẢ HOẠT ĐỘNG PTCB THỰC TẾ (TÍNH TOÁN THEO THỊ GIÁ ${realtimeInfo?.formattedPrice || 'HIỆN TẠI'}):
+- LNST 4 quý gần nhất (TTM): ${vm.formattedTtmNetProfit}
+- Doanh thu/Thu nhập 4 quý gần nhất (TTM): ${vm.formattedTtmRevenue}
+- Vốn chủ sở hữu: ${realtimeInfo?.financialStatements?.quarters?.[0]?.formattedEquity || 'N/A'}
+- EPS (Lợi nhuận trên mỗi cổ phiếu TTM): ${vm.formattedEps}
+- BVPS (Giá trị sổ sách trên mỗi cổ phiếu): ${vm.formattedBvps}
+- Chỉ số Định giá P/E thực tế: ${vm.pe !== undefined ? `${vm.pe}x` : 'Tính theo giá/EPS'}
+- Chỉ số Định giá P/B thực tế: ${vm.pb !== undefined ? `${vm.pb}x` : 'Tính theo giá/BVPS'}
+- Tỷ suất sinh lời: ROE = ${vm.roe}% | ROA = ${vm.roa}%
+${vm.nim !== undefined ? `- Chỉ số Ngân hàng: NIM = ${vm.nim}% | CASA = ${vm.casa}% | Tỷ lệ nợ xấu NPL = ${vm.npl}% | Tỷ lệ bao phủ nợ xấu LLR = ${vm.llr}%` : ''}
+` : '';
+
   const financialContext = (realtimeInfo?.financialStatements && realtimeInfo.financialStatements.quarters.length > 0)
     ? `BẢNG SỐ LIỆU BÁO CÁO TÀI CHÍNH XÁC THỰC 100% CỦA ${tickerSymbol} TỪ CƠ SỞ DỮ LIỆU BÁO CÁO TÀI CHÍNH DOANH NGHIỆP NIÊM YẾT (SIMPLIZE & HOSE/HNX):
 ${realtimeInfo.financialStatements.quarters.map(q => 
 `- [${q.period}]: Doanh thu/Thu nhập = ${q.formattedRevenue} | Lợi nhuận gộp = ${q.formattedGrossProfit} (Biên LN gộp: ${q.grossMargin}%) | Lợi nhuận sau thuế (LNST) = ${q.formattedNetProfit}${q.formattedTotalAssets ? ` | Tổng tài sản = ${q.formattedTotalAssets}` : ''}${q.debtToEquity !== undefined ? ` | Tỷ lệ D/E = ${q.debtToEquity}x` : ''}`
 ).join('\n')}
 ${realtimeInfo.financialStatements.latestYearSummary ? `- Lũy kế gần nhất: Tổng Doanh thu = ${realtimeInfo.financialStatements.latestYearSummary.formattedTotalRevenue}, Tổng LNST = ${realtimeInfo.financialStatements.latestYearSummary.formattedTotalNetProfit}` : ''}
+${valuationContext}
 
 QUY TẮC BẮT BUỘC VỀ SỐ LIỆU TÀI CHÍNH TRONG "fundamental" VÀ HỎI ĐÁP:
-- BẮT BUỘC SỬ DỤNG CHÍNH XÁC 100% CÁC CON SỐ DOANH THU/THU NHẬP, LNST TRONG BẢNG BCTC XÁC THỰC TRÊN.
+- BẮT BUỘC SỬ DỤNG CHÍNH XÁC 100% CÁC CON SỐ DOANH THU/THU NHẬP, LNST, P/E, P/B, EPS, BVPS, ROE, ROA TRONG BẢNG TRÊN.
 - ĐÂY LÀ DỮ LIỆU TÀI CHÍNH THẬT 100% ĐÃ ĐƯỢC DOANH NGHIỆP CÔNG BỐ. TUYỆT ĐỐI KHÔNG ĐƯỢC NÓI LÀ 'DỮ LIỆU GIẢ ĐỊNH'!
 - Khi người dùng hỏi nguồn gốc/dẫn chứng của các con số này trong phần Hỏi Đáp, BẮT BUỘC trả lời rõ nguồn trích xuất từ Báo cáo tài chính chính thức của doanh nghiệp qua cơ sở dữ liệu Simplize và Sở Giao dịch Chứng khoán.`
     : '';
@@ -705,11 +740,9 @@ YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (SỬ DỤNG GOOGLE SEARCH GRO
    - 2. Vị thế Thị phần & So sánh Trực diện Đối thủ: Nêu rõ ước tính % thị phần của "${tickerSymbol}", quy mô điểm bán/cửa hàng/công suất so sánh trực diện với các đối thủ chính (nêu đích danh tên các đối thủ lớn như DOJI, SJC, Bảo Tín Minh Châu đối với PNJ; Hoa Sen, Nam Kim đối với HPG; VPS, VNDirect, TCBS đối với SSI...).
    - 3. Bóc tách Biên Lợi nhuận & Xúc tác Ngành: Bóc tách biên lợi nhuận giữa các mảng kinh doanh cốt lõi và các chính sách quản lý nhà nước (nghị định, quy định mới) đang định hình lại ngành.
 • "fundamental" (Phân tích Cơ bản Doanh nghiệp): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
-   - CẬP NHẬT KẾT QUẢ KINH DOANH MỚI NHẤT (BẮT BUỘC TRÍCH DẪN SỐ LIỆU XÁC THỰC Ở TRÊN): Nêu rõ Doanh thu thuần, LNST của các quý gần nhất (${realtimeInfo?.financialStatements?.quarters?.map(q => q.period).join(', ') || 'các quý mới nhất'}) và lũy kế đạt bao nhiêu tỷ đồng, biên lợi nhuận gộp bao nhiêu % theo đúng bảng số liệu BCTC được cấp.
-   - BIÊN LỢI NHUẬN & HIỆU QUẢ HOẠT ĐỘNG: Phân tích chi tiết Biên lợi nhuận gộp thực tế, ROE, ROA, EPS.
-   - ĐỊNH GIÁ: Định giá P/E, P/B hiện tại ở mức giá "${realtimeInfo?.formattedPrice || 'thị trường'}" so với trung bình ngành và định giá lịch sử.
-   - SỨC KHỎE TÀI CHÍNH: Tỷ lệ Nợ vay/Vốn chủ sở hữu (D/E), cơ cấu nợ, khả năng thanh toán.
-   - ĐỘNG LỰC TĂNG TRƯỞNG & RỦI RO: Đánh giá mảng kinh doanh đóng góp doanh thu lớn nhất, xúc tác tăng trưởng và các rủi ro hoạt động.
+   - 1. Kết Quả Kinh Doanh & Biên Lợi Nhuận: Trích dẫn chính xác Doanh thu/Thu nhập, LNST của các quý gần nhất (${realtimeInfo?.financialStatements?.quarters?.map(q => q.period).join(', ') || 'các quý mới nhất'}) và lũy kế đạt bao nhiêu tỷ đồng, biên lợi nhuận gộp bao nhiêu % theo đúng bảng số liệu BCTC được cấp.
+   - 2. Chỉ Số Định Giá Thực Tế (P/E, P/B, EPS, BVPS): BẮT BUỘC TRÍCH DẪN VÀ ĐÁNH GIÁ CHÍNH XÁC P/E = ${vm?.pe !== undefined ? `${vm.pe}x` : 'thực tế'}, P/B = ${vm?.pb !== undefined ? `${vm.pb}x` : 'thực tế'}, EPS = ${vm?.formattedEps || 'thực tế'}, BVPS = ${vm?.formattedBvps || 'thực tế'} ở mức giá "${realtimeInfo?.formattedPrice || 'thị trường'}" so với trung bình ngành và định giá lịch sử. TUYỆT ĐỐI CẤM VIẾT VĂN MẪU 'cần được tính toán', MÀ PHẢI ĐƯA TRỰC TIẾP CÁC CON SỐ NÀY VÀO ĐỊNH GIÁ!
+   - 3. Sức Khỏe Tài Chính & Hiệu Quả Hoạt Động (ROE, ROA${vm?.isBank ? ', NIM, CASA, NPL' : ', D/E'}): Trích dẫn ROE = ${vm?.roe || 0}%, ROA = ${vm?.roa || 0}%${vm?.isBank ? `, NIM = ${vm?.nim || 'N/A'}%, CASA = ${vm?.casa || 'N/A'}%, Nợ xấu NPL = ${vm?.npl || 'N/A'}%` : ''}, phân tích chất lượng tài sản và động lực tăng trưởng cốt lõi.
    - TUYỆT ĐỐI KHÔNG nhận định định tính chung chung mà PHẢI gắn liền với các số liệu tài chính thực tế đã được cung cấp.
 • "technical" (Phân tích Kỹ thuật & Dòng tiền): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
    - Nhận định xu hướng giá ngắn hạn và trung hạn.
