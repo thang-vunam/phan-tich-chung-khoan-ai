@@ -1139,14 +1139,17 @@ const fetchIndustryAnalysisInternal = async (industryInput: string): Promise<{ r
 
 BỐI CẢNH THỊ TRƯỜNG THỰC TẾ:
 - Thanh khoản thị trường thực tế (Tính toán động 20 phiên gần nhất từ sàn giao dịch): ${dynamicLiquidity}.
-- Động thái Khối ngoại thực tế: Đang duy trì trạng thái BÁN RÒNG, tạo áp lực cơ cấu danh mục lên các cổ phiếu vốn hóa lớn.
-- Động lực chung: Triển vọng vận hành hệ thống KRX, tháo gỡ nút thắt Non-pre-funding để nâng hạng thị trường FTSE/MSCI và các chính sách thúc đẩy kinh tế.
+- Động lực chính sách & Vĩ mô ngành:
+  * Cơ chế Non-pre-funding theo Thông tư 68/2024/TT-BTC (cho phép NĐT tổ chức nước ngoài mua chứng khoán không yêu cầu ký quỹ 100% tiền) tháo gỡ rào cản trọng yếu nhất để FTSE Russell nâng hạng thị trường Việt Nam lên Emerging Markets.
+  * Tăng trưởng quy mô vốn điều lệ, mở rộng dư nợ cho vay ký quỹ (Margin) và phát triển mảng ngân hàng đầu tư (IB) của các CTCK.
+  * Động thái dòng vốn ngoại (FII) và dòng tiền cá nhân trong nước theo bối cảnh lãi suất và tỷ giá thực tế.
 
-QUY TẮC BẮT BUỘC VỀ BỐI CẢNH THỊ TRƯỜNG:
-- Trường "foreignInvestors": BẮT BUỘC phản ánh đúng xu hướng thực tế là "Bán ròng" hoặc "Chịu áp lực bán ròng". TUYỆT ĐỐI KHÔNG ghi mua ròng!
+QUY TẮC BẮT BUỘC VỀ BỐI CẢNH & DÒNG TIỀN:
+- Trường "foreignInvestors": Tra cứu thông qua Google Search để phản ánh chính xác động thái mua/bán ròng thực tế của Khối ngoại gần đây. Tuyệt đối không tự bịa đặt số phiên bán ròng tĩnh.
 - Trường "liquidity": BẮT BUỘC phản ánh theo dữ liệu thanh khoản thực tế: "${dynamicLiquidity}".
+- TUYỆT ĐỐI KHÔNG nhắc đến "triển vọng vận hành hệ thống KRX" vì đây là câu chuyện cũ đã lỗi thời. Hãy tập trung vào Thông tư 68 tháo gỡ Non-pre-funding và lộ trình nâng hạng FTSE Emerging Markets!
 
-YÊU CẦU CỔ PHIẾU NỔI BẬT: BẮT BUỘC chọn lọc từ 3 đến 4 cổ phiếu đầu ngành/dẫn dắt tiêu biểu nhất (ví dụ ngành Chứng khoán: SSI, VND, HCM, VCI; Thép: HPG, HSG, NKG; Ngân hàng: VCB, TCB, MBB, ACB; Bất động sản: VHM, KDH, NLG; Bán lẻ: MWG, FRT, PNJ...).
+YÊU CẦU CỔ PHIẾU NỔI BẬT: BẮT BUỘC chọn lọc từ 3 đến 4 cổ phiếu đầu ngành/dẫn dắt tiêu biểu nhất (ví dụ ngành Chứng khoán: SSI, VND, HCM, VCI, TCBS; Thép: HPG, HSG, NKG; Ngân hàng: VCB, TCB, MBB, ACB; Bất động sản: VHM, KDH, NLG; Bán lẻ: MWG, FRT, PNJ...).
 YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP nói về ngành "${industryInput}" hoặc các doanh nghiệp lớn trong ngành trong 7 ngày gần đây. Nếu không tìm thấy, trả về "news": [].
 
 Trả về JSON cấu trúc:
@@ -1202,7 +1205,7 @@ Trả về JSON cấu trúc:
         { symbol: 'NLG', companyName: 'Nam Long', price: 'Theo dõi thị giá', highlights: 'Đối tác chiến lược Nhật Bản, phát triển các khu đô thị vệ tinh quy mô lớn.', recommendation: 'THEO DÕI' }
       ],
       'Chứng khoán': [
-        { symbol: 'SSI', companyName: 'Chứng khoán SSI', price: 'Theo dõi thị giá', highlights: 'Thị phần hàng đầu, quy mô vốn chủ sở hữu lớn hưởng lợi trực tiếp từ KRX và nâng hạng.', recommendation: 'MUA' },
+        { symbol: 'SSI', companyName: 'Chứng khoán SSI', price: 'Theo dõi thị giá', highlights: 'Thị phần hàng đầu, quy mô vốn chủ sở hữu lớn hưởng lợi trực tiếp từ cơ chế Non-pre-funding và nâng hạng thị trường.', recommendation: 'MUA' },
         { symbol: 'HCM', companyName: 'HSC', price: 'Theo dõi thị giá', highlights: 'Thế mạnh mảng khách hàng tổ chức nước ngoài và mảng cho vay ký quỹ (margin).', recommendation: 'MUA' },
         { symbol: 'VCI', companyName: 'Vietcap', price: 'Theo dõi thị giá', highlights: 'Dẫn đầu mảng ngân hàng đầu tư (IB) với các thương vụ tư vấn M&A lớn.', recommendation: 'MUA' },
         { symbol: 'VND', companyName: 'VNDIRECT', price: 'Theo dõi thị giá', highlights: 'Hệ sinh thái số, tệp khách hàng cá nhân rộng lớn và mảng môi giới phát triển.', recommendation: 'THEO DÕI' }
