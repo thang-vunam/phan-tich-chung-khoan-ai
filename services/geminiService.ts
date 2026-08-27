@@ -728,12 +728,12 @@ YÊU CẦU ĐỊNH GIÁ & MỤC TIÊU GIÁ:
 - Các mức giá mục tiêu trong "targetPrices" (shortTerm, midTerm, longTerm): ${targetPriceRule}.
 - Phải có tỷ lệ phần trăm kỳ vọng (+X%) và luận điểm ngắn gọn, thuyết phục trong "label".
 
-YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (SỬ DỤNG GOOGLE SEARCH GROUNDING ĐỂ LẤY SỐ LIỆU ĐỊNH LƯỢNG MỚI NHẤT, TUYỆT ĐỐI CẤM VĂN MẪU LÝ THUYẾT):
+YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC SỬ DỤNG GOOGLE SEARCH GROUNDING ĐỂ LẤY SỐ LIỆU ĐỊNH LƯỢNG THỰC TẾ THEO THỜI GIAN THỰC, TUYỆT ĐỐI CẤM VĂN MẪU LÝ THUYẾT HOẶC SỐ LIỆU CŨ TRONG QUÁ KHỨ):
 • "macro" (Phân tích Vĩ mô & Vi mô Tác động Trực tiếp): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
-   - Sử dụng Google Search để lấy số liệu thực tế mới nhất:
-   - 1. Môi trường Tiền tệ & Lãi suất: Nêu con số mặt bằng lãi suất huy động và lãi suất cho vay thực tế của các NHTM, tác động trực tiếp đến chi phí tài chính và khả năng tiếp cận vốn của doanh nghiệp.
-   - 2. Tỷ giá & Hàng hóa Nguyên liệu: Nêu chính xác tỷ giá USD/VND thời điểm hiện tại từ thị trường ngoại hối (khoảng 26.060 - 26.090 VND/USD) và diễn biến giá hàng hóa/nguyên liệu thế giới liên quan trực tiếp đến ngành (giá vàng thế giới & trong nước, giá quặng sắt, giá dầu Brent...) tác động đến giá vốn và biên lãi.
-   - 3. Lạm phát & Sức mua Tiêu dùng: Nêu con số lạm phát CPI thực tế công bố mới nhất từ Tổng cục Thống kê (4.45% YoY), tăng trưởng tổng mức bán lẻ tiêu dùng (+8.5% - 9.2% YoY), tác động từ chính sách giảm thuế VAT hoặc đẩy mạnh đầu tư công đến sức cầu sản phẩm của doanh nghiệp.
+   - Sử dụng Google Search để tìm kiếm và cập nhật số liệu thị trường mới nhất hôm nay:
+   - 1. Môi trường Tiền tệ & Lãi suất: Tra cứu mặt bằng lãi suất huy động và cho vay thực tế của các NHTM hôm nay, phân tích tác động trực tiếp đến chi phí tài chính và khả năng tiếp cận vốn của doanh nghiệp.
+   - 2. Tỷ giá & Hàng hóa Nguyên liệu: Tra cứu chính xác tỷ giá USD/VND thị trường tự do/ngân hàng và giá các mặt hàng nguyên liệu/hàng hóa thế giới & trong nước liên quan trực tiếp đến ngành của "${tickerSymbol}" (ví dụ: nếu ngành Vàng bạc trang sức như PNJ thì tra cứu trực tiếp Giá vàng thế giới Spot Gold USD/oz và Giá vàng SJC/vàng nhẫn trong nước hôm nay; nếu ngành Thép như HPG thì tra cứu giá quặng sắt & giá thép cuộn cán nóng HRC; nếu ngành Dầu khí thì tra cứu giá dầu Brent; nếu ngành Phân bón/Hóa chất thì tra cứu giá Urê...), tác động đến giá vốn hàng bán và biên lợi nhuận.
+   - 3. Lạm phát & Sức mua Tiêu dùng: Tra cứu chỉ số lạm phát CPI và tăng trưởng tổng mức bán lẻ tiêu dùng mới nhất do Tổng cục Thống kê (GSO) công bố, tác động từ chính sách giảm thuế hoặc đầu tư công đến sức cầu sản phẩm.
 • "industry" (Phân tích Cấu trúc Ngành & Cạnh tranh Đối đầu): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
    - BẮT BUỘC NÊU RÕ CON SỐ THỊ PHẦN, QUY MÔ VÀ ĐỐI THỦ CẠNH TRANH:
    - 1. Cấu trúc & Xu hướng Chuyển dịch Ngành: Nêu quy mô thị trường, tốc độ tăng trưởng ngành và xu hướng chuyển dịch chuỗi giá trị (từ mô hình truyền thống/nhỏ lẻ sang chuỗi bán lẻ hiện đại có thương hiệu).
@@ -873,8 +873,8 @@ const sendChatWithToolFallback = async (
       const config: any = {
         temperature: 0.1,
         maxOutputTokens: 8192,
-        responseMimeType: 'application/json',
         systemInstruction,
+        tools: [{ googleSearch: {} }],
       };
 
       // Chỉ thêm thinkingConfig cho gemini-2.5-flash (tránh lỗi 400 INVALID_ARGUMENT ở các model khác)
