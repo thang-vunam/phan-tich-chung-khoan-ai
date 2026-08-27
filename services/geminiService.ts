@@ -1140,14 +1140,14 @@ const fetchIndustryAnalysisInternal = async (industryInput: string): Promise<{ r
 BỐI CẢNH THỊ TRƯỜNG THỰC TẾ:
 - Thanh khoản thị trường thực tế (Tính toán động 20 phiên gần nhất từ sàn giao dịch): ${dynamicLiquidity}.
 - Động lực chính sách & Vĩ mô ngành:
-  * Cơ chế Non-pre-funding theo Thông tư 68/2024/TT-BTC (cho phép NĐT tổ chức nước ngoài mua chứng khoán không yêu cầu ký quỹ 100% tiền) tháo gỡ rào cản trọng yếu nhất để FTSE Russell nâng hạng thị trường Việt Nam lên Emerging Markets.
+  * Sử dụng Google Search Grounding để tra cứu các văn bản chính sách pháp lý mới nhất của Bộ Tài chính / UBCKNN (về cơ chế giao dịch, giao dịch không ký quỹ 100% Non-pre-funding, quản trị rủi ro), các dự án hạ tầng công nghệ và tiến trình nâng hạng thị trường chứng khoán (FTSE/MSCI) ĐANG ĐƯỢC ÁP DỤNG THỰC TẾ tại thời điểm phân tích.
   * Tăng trưởng quy mô vốn điều lệ, mở rộng dư nợ cho vay ký quỹ (Margin) và phát triển mảng ngân hàng đầu tư (IB) của các CTCK.
   * Động thái dòng vốn ngoại (FII) và dòng tiền cá nhân trong nước theo bối cảnh lãi suất và tỷ giá thực tế.
 
 QUY TẮC BẮT BUỘC VỀ BỐI CẢNH & DÒNG TIỀN:
-- Trường "foreignInvestors": Tra cứu thông qua Google Search để phản ánh chính xác động thái mua/bán ròng thực tế của Khối ngoại gần đây. Tuyệt đối không tự bịa đặt số phiên bán ròng tĩnh.
+- Trường "foreignInvestors": Tra cứu thông qua Google Search để phản ánh chính xác động thái mua/bán ròng thực tế của Khối ngoại trong các phiên gần nhất. Tuyệt đối không tự gán số liệu tĩnh.
 - Trường "liquidity": BẮT BUỘC phản ánh theo dữ liệu thanh khoản thực tế: "${dynamicLiquidity}".
-- TUYỆT ĐỐI KHÔNG nhắc đến "triển vọng vận hành hệ thống KRX" vì đây là câu chuyện cũ đã lỗi thời. Hãy tập trung vào Thông tư 68 tháo gỡ Non-pre-funding và lộ trình nâng hạng FTSE Emerging Markets!
+- TẤT CẢ CÁC THÔNG TIN VỀ CHÍNH SÁCH, VĂN BẢN QUY PHẠM PHÁP LUẬT VÀ DỰ ÁN CÔNG NGHỆ BẮT BUỘC PHẢI DỰA TRÊN THỰC TẾ ĐANG VẬN HÀNH THỜI ĐIỂM HIỆN TẠI (thông qua Google Search), TUYỆT ĐỐI KHÔNG LẤY CÁC KỲ VỌNG LỖI THỜI ĐÃ BỊ HOÃN/THAY THẾ TRONG QUÁ KHỨ!
 
 YÊU CẦU CỔ PHIẾU NỔI BẬT: BẮT BUỘC chọn lọc từ 3 đến 4 cổ phiếu đầu ngành/dẫn dắt tiêu biểu nhất (ví dụ ngành Chứng khoán: SSI, VND, HCM, VCI, TCBS; Thép: HPG, HSG, NKG; Ngân hàng: VCB, TCB, MBB, ACB; Bất động sản: VHM, KDH, NLG; Bán lẻ: MWG, FRT, PNJ...).
 YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP nói về ngành "${industryInput}" hoặc các doanh nghiệp lớn trong ngành trong 7 ngày gần đây. Nếu không tìm thấy, trả về "news": [].
