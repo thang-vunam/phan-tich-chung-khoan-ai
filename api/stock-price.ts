@@ -158,7 +158,7 @@ async function fetchFinancialStatements(symbol: string): Promise<FinancialStatem
     const fmtTỷ = (val: number) => `${(val / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tỷ VND`;
 
     for (const item of items) {
-      const isBank = (item.bs7 !== undefined && item.bs7 > 0) || (item.is14 !== undefined && item.is14 > 0);
+      const isBank = (item.bs7 !== undefined && item.bs7 > 0) && (item.is4 === undefined || item.is4 === 0);
       
       // Doanh thu thuần chuẩn VAS (is1 hoặc is4)
       const rev = item.is1 || item.is4 || 0;
@@ -203,7 +203,7 @@ async function fetchFinancialStatements(symbol: string): Promise<FinancialStatem
     });
 
     const latestItem = items[0] || {};
-    const isBankLatest = (latestItem.bs7 !== undefined && latestItem.bs7 > 0) || (latestItem.is14 !== undefined && latestItem.is14 > 0);
+    const isBankLatest = (latestItem.bs7 !== undefined && latestItem.bs7 > 0) && (latestItem.is4 === undefined || latestItem.is4 === 0);
     const charterCap = latestItem.bs11 || (latestItem.op49 ? latestItem.op49 * 10000 : 0);
     const sharesOutstanding = charterCap > 0 ? charterCap / 10000 : (latestItem.op49 || 1);
     const equity = latestItem.bs10 || 1;
