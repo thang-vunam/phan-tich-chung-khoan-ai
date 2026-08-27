@@ -185,7 +185,18 @@ const App: React.FC = () => {
 
     try {
       const response = await chatSession.sendMessage({ message });
-      const htmlContent = markdownToHtml(response.text);
+      let text = response.text || '';
+      // Nếu AI trả về JSON do cấu hình mime-type trước đó, bóc tách text
+      try {
+        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        if (parsed.error) text = parsed.error;
+        else if (parsed.message) text = parsed.message;
+        else if (parsed.content) text = parsed.content;
+        else if (parsed.answer) text = parsed.answer;
+      } catch (e) {}
+
+      const htmlContent = markdownToHtml(text);
       const modelMessage: ChatMessage = { role: 'model', content: htmlContent };
       setChatHistory(prev => [...prev, modelMessage]);
     } catch (err) {

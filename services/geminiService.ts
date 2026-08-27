@@ -646,15 +646,16 @@ BẮT BUỘC: Bạn PHẢI sử dụng và trích xuất các bài báo trong da
     : `YÊU CẦU TIN TỨC: CHỈ lấy tin tức TRỰC TIẾP trong 7 ngày gần đây. Nếu không có tin trong 7 ngày, trả về "news": [].`;
 
   const financialContext = (realtimeInfo?.financialStatements && realtimeInfo.financialStatements.quarters.length > 0)
-    ? `BẢNG SỐ LIỆU BÁO CÁO TÀI CHÍNH THỰC TẾ ĐÃ CÔNG BỐ (XÁC THỰC 100% TỪ BCTC DOANH NGHIỆP):
+    ? `BẢNG SỐ LIỆU BÁO CÁO TÀI CHÍNH XÁC THỰC 100% CỦA ${tickerSymbol} TỪ CƠ SỞ DỮ LIỆU BÁO CÁO TÀI CHÍNH DOANH NGHIỆP NIÊM YẾT (SIMPLIZE & HOSE/HNX):
 ${realtimeInfo.financialStatements.quarters.map(q => 
-`- [${q.period}]: Doanh thu thuần = ${q.formattedRevenue} | Lợi nhuận gộp = ${q.formattedGrossProfit} (Biên LN gộp: ${q.grossMargin}%) | Lợi nhuận sau thuế (LNST) = ${q.formattedNetProfit}${q.formattedTotalAssets ? ` | Tổng tài sản = ${q.formattedTotalAssets}` : ''}${q.debtToEquity !== undefined ? ` | Tỷ lệ D/E (Nợ/Vốn CSH) = ${q.debtToEquity}x` : ''}`
+`- [${q.period}]: Doanh thu/Thu nhập = ${q.formattedRevenue} | Lợi nhuận gộp = ${q.formattedGrossProfit} (Biên LN gộp: ${q.grossMargin}%) | Lợi nhuận sau thuế (LNST) = ${q.formattedNetProfit}${q.formattedTotalAssets ? ` | Tổng tài sản = ${q.formattedTotalAssets}` : ''}${q.debtToEquity !== undefined ? ` | Tỷ lệ D/E = ${q.debtToEquity}x` : ''}`
 ).join('\n')}
 ${realtimeInfo.financialStatements.latestYearSummary ? `- Lũy kế gần nhất: Tổng Doanh thu = ${realtimeInfo.financialStatements.latestYearSummary.formattedTotalRevenue}, Tổng LNST = ${realtimeInfo.financialStatements.latestYearSummary.formattedTotalNetProfit}` : ''}
 
-QUY TẮC BẮT BUỘC VỀ SỐ LIỆU TÀI CHÍNH TRONG "fundamental":
-- BẮT BUỘC SỬ DỤNG CHÍNH XÁC 100% CÁC CON SỐ DOANH THU, LỢI NHUẬN, BIÊN LÃI TRONG BẢNG SỐ LIỆU XÁC THỰC TRÊN.
-- TUYỆT ĐỐI KHÔNG TỰ SUY ĐOÁN, NGOẠI SUY HOẶC ĐƯA RA CÁC CON SỐ DOANH THU/LNST KHÁC VỚI BẢNG TRÊN!`
+QUY TẮC BẮT BUỘC VỀ SỐ LIỆU TÀI CHÍNH TRONG "fundamental" VÀ HỎI ĐÁP:
+- BẮT BUỘC SỬ DỤNG CHÍNH XÁC 100% CÁC CON SỐ DOANH THU/THU NHẬP, LNST TRONG BẢNG BCTC XÁC THỰC TRÊN.
+- ĐÂY LÀ DỮ LIỆU TÀI CHÍNH THẬT 100% ĐÃ ĐƯỢC DOANH NGHIỆP CÔNG BỐ. TUYỆT ĐỐI KHÔNG ĐƯỢC NÓI LÀ 'DỮ LIỆU GIẢ ĐỊNH'!
+- Khi người dùng hỏi nguồn gốc/dẫn chứng của các con số này trong phần Hỏi Đáp, BẮT BUỘC trả lời rõ nguồn trích xuất từ Báo cáo tài chính chính thức của doanh nghiệp qua cơ sở dữ liệu Simplize và Sở Giao dịch Chứng khoán.`
     : '';
 
   return `Bạn là Giám đốc Phân tích Đầu tư Chứng khoán Cao cấp (Head of Equity Research) hàng đầu tại Việt Nam. Hãy lập BÁO CÁO PHÂN TÍCH CHUYÊN SÂU, TOÀN DIỆN VÀ SẮC BÉN về mã cổ phiếu "${tickerSymbol}".
@@ -692,12 +693,12 @@ YÊU CẦU ĐỊNH GIÁ & MỤC TIÊU GIÁ:
 - Các mức giá mục tiêu trong "targetPrices" (shortTerm, midTerm, longTerm): ${targetPriceRule}.
 - Phải có tỷ lệ phần trăm kỳ vọng (+X%) và luận điểm ngắn gọn, thuyết phục trong "label".
 
-YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (BẮT BUỘC SẮC BÉN, CÓ CON SỐ LIỆU ĐỊNH LƯỢNG THỰC TẾ, TUYỆT ĐỐI CẤM VĂN MẪU LÝ THUYẾT CHUNG CHUNG):
+YÊU CẦU CHẤT LƯỢNG NỘI DUNG PHÂN TÍCH (SỬ DỤNG GOOGLE SEARCH GROUNDING ĐỂ LẤY SỐ LIỆU ĐỊNH LƯỢNG MỚI NHẤT, TUYỆT ĐỐI CẤM VĂN MẪU LÝ THUYẾT):
 • "macro" (Phân tích Vĩ mô & Vi mô Tác động Trực tiếp): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
-   - BẮT BUỘC PHẢI ĐƯA RA CÁC CON SỐ LIỆU ĐỊNH LƯỢNG VĨ MÔ THỰC TẾ (TUYỆT ĐỐI CẤM văn mẫu lý thuyết như "nếu lạm phát tăng...", "chính sách linh hoạt...").
-   - 1. Môi trường Tiền tệ & Lãi suất: Nêu con số mặt bằng lãi suất huy động (~5.0% - 5.8%/năm), lãi suất cho vay (~8.0% - 9.5%/năm) của các NHTM, tác động trực tiếp đến chi phí tài chính và khả năng tiếp cận vốn của doanh nghiệp.
-   - 2. Tỷ giá & Hàng hóa Nguyên liệu: Nêu con số tỷ giá USD/VND thực tế (đang giao dịch quanh mốc 26.060 - 26.088 VND/USD, chịu áp lực tăng giá theo biến động thị trường ngoại hối) và diễn biến giá hàng hóa/nguyên liệu thế giới liên quan trực tiếp đến ngành (ví dụ: giá vàng thế giới USD/oz & vàng trong nước triệu đ/lượng, giá quặng sắt USD/tấn, giá dầu Brent USD/thùng...) tác động đến giá vốn và biên lãi.
-   - 3. Lạm phát & Sức mua Tiêu dùng: Nêu con số lạm phát CPI thực tế theo Tổng cục Thống kê (đạt 4.45% YoY, áp sát trần mục tiêu 4.5% của Quốc hội), tăng trưởng tổng mức bán lẻ tiêu dùng (+8.5% - 9.2% YoY), tác động từ chính sách giảm thuế VAT 2% hoặc đẩy mạnh đầu tư công đến sức cầu sản phẩm của doanh nghiệp.
+   - Sử dụng Google Search để lấy số liệu thực tế mới nhất:
+   - 1. Môi trường Tiền tệ & Lãi suất: Nêu con số mặt bằng lãi suất huy động và lãi suất cho vay thực tế của các NHTM, tác động trực tiếp đến chi phí tài chính và khả năng tiếp cận vốn của doanh nghiệp.
+   - 2. Tỷ giá & Hàng hóa Nguyên liệu: Nêu chính xác tỷ giá USD/VND thời điểm hiện tại từ thị trường ngoại hối (khoảng 26.060 - 26.090 VND/USD) và diễn biến giá hàng hóa/nguyên liệu thế giới liên quan trực tiếp đến ngành (giá vàng thế giới & trong nước, giá quặng sắt, giá dầu Brent...) tác động đến giá vốn và biên lãi.
+   - 3. Lạm phát & Sức mua Tiêu dùng: Nêu con số lạm phát CPI thực tế công bố mới nhất từ Tổng cục Thống kê (4.45% YoY), tăng trưởng tổng mức bán lẻ tiêu dùng (+8.5% - 9.2% YoY), tác động từ chính sách giảm thuế VAT hoặc đẩy mạnh đầu tư công đến sức cầu sản phẩm của doanh nghiệp.
 • "industry" (Phân tích Cấu trúc Ngành & Cạnh tranh Đối đầu): Gồm 2-3 tiểu mục (đánh số 1, 2, 3):
    - BẮT BUỘC NÊU RÕ CON SỐ THỊ PHẦN, QUY MÔ VÀ ĐỐI THỦ CẠNH TRANH:
    - 1. Cấu trúc & Xu hướng Chuyển dịch Ngành: Nêu quy mô thị trường, tốc độ tăng trưởng ngành và xu hướng chuyển dịch chuỗi giá trị (từ mô hình truyền thống/nhỏ lẻ sang chuỗi bán lẻ hiện đại có thương hiệu).
