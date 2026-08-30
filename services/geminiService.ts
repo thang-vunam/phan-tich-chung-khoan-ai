@@ -537,24 +537,30 @@ export const fetchRealtimeStockInfo = async (ticker: string): Promise<RealtimeSt
     // Chuyển sang fallback nếu chạy môi trường local dev server
   }
 
-  // 2. Direct fetch fallback
+  // 2. Direct fetch fallback qua VNDirect DChart API
   const to = Math.floor(Date.now() / 1000);
-  const fromIntraday = to - 3600 * 6;
-  const fromIndex = to - 86400 * 30;
+  const fromIntraday = to - 3600 * 8;
+  const fromIndex = to - 86400 * 45;
+
+  const fetchDirect = async (url: string) => {
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (r.ok) return await r.json();
+    } catch (e) {}
+    return null;
+  };
   
   try {
     const [stockRes1m, stockRes1d, indexRes, hnxRes, upcomRes] = await Promise.all([
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromIntraday}&to=${to}&symbol=${cleanTicker}&resolution=1`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromIndex}&to=${to}&symbol=${cleanTicker}&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${to}&symbol=VNINDEX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${to}&symbol=HNX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIndex}&to=${to}&symbol=UPCOM&resolution=1D`).catch(() => null)
+      fetchDirect(`https://dchart-api.vndirect.com.vn/dchart/history?symbol=${cleanTicker}&resolution=1&from=${fromIntraday}&to=${to}`),
+      fetchDirect(`https://dchart-api.vndirect.com.vn/dchart/history?symbol=${cleanTicker}&resolution=D&from=${fromIndex}&to=${to}`),
+      fetchDirect(`https://dchart-api.vndirect.com.vn/dchart/history?symbol=VNINDEX&resolution=D&from=${fromIndex}&to=${to}`),
+      fetchDirect(`https://dchart-api.vndirect.com.vn/dchart/history?symbol=HNX&resolution=D&from=${fromIndex}&to=${to}`),
+      fetchDirect(`https://dchart-api.vndirect.com.vn/dchart/history?symbol=UPCOM&resolution=D&from=${fromIndex}&to=${to}`)
     ]);
 
-    let data1m: any = null;
-    let data1d: any = null;
-    if (stockRes1m && stockRes1m.ok) data1m = await stockRes1m.json();
-    if (stockRes1d && stockRes1d.ok) data1d = await stockRes1d.json();
+    let data1m: any = stockRes1m;
+    let data1d: any = stockRes1d;
 
     let lastClose = 0;
     let lastHigh = 0;

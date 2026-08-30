@@ -266,27 +266,76 @@ export default async function handler(req: any, res: any) {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const fromIntraday = now - 3600 * 6; // 6 giờ gần nhất
-  const fromDaily = now - 86400 * 30; // 30 ngày nến
+  const fromIntraday = now - 3600 * 8; // 8 giờ gần nhất
+  const fromDaily = now - 86400 * 45; // 45 ngày nến
+
+  const fetchOhlc = async (sym: string, resolution: string, from: number) => {
+    // 1. Ưu tiên VNDirect DChart API (chuẩn 100% dữ liệu ATC sàn HOSE/HNX/UPCOM)
+    try {
+      const res = await fetch(`https://dchart-api.vndirect.com.vn/dchart/history?symbol=${sym}&resolution=${resolution}&from=${from}&to=${now}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.c) && data.c.length > 0) {
+          return data;
+        }
+      }
+    } catch (e) {}
+
+    // 2. Fallback sang Entrade nếu VNDirect tạm thời không phản hồi
+    try {
+      const res = await fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${from}&to=${now}&symbol=${sym}&resolution=${resolution === 'D' ? '1D' : resolution}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.c) && data.c.length > 0) {
+          return data;
+        }
+      }
+    } catch (e) {}
+
+    return null;
+  };
+
+  const fetchIndexOhlc = async (sym: string, resolution: string, from: number) => {
+    // Ưu tiên VNDirect DChart API
+    try {
+      const res = await fetch(`https://dchart-api.vndirect.com.vn/dchart/history?symbol=${sym}&resolution=${resolution}&from=${from}&to=${now}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.c) && data.c.length > 0) {
+          return data;
+        }
+      }
+    } catch (e) {}
+
+    // Fallback Entrade
+    try {
+      const res = await fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${from}&to=${now}&symbol=${sym}&resolution=${resolution === 'D' ? '1D' : resolution}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.c) && data.c.length > 0) {
+          return data;
+        }
+      }
+    } catch (e) {}
+
+    return null;
+  };
 
   try {
-    const [stock1mRes, stock1dRes, vnIndex1mRes, vnIndex1dRes, hnxRes, upcomRes, newsItems, financials] = await Promise.all([
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromIntraday}&to=${now}&symbol=${symbol}&resolution=1`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromDaily}&to=${now}&symbol=${symbol}&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromIntraday}&to=${now}&symbol=VNINDEX&resolution=1`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromDaily}&to=${now}&symbol=VNINDEX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromDaily}&to=${now}&symbol=HNX&resolution=1D`).catch(() => null),
-      fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/index?from=${fromDaily}&to=${now}&symbol=UPCOM&resolution=1D`).catch(() => null),
+    const [stock1mData, stock1dData, vn1mData, vn1dData, hnxData, upcomData, newsItems, financials] = await Promise.all([
+      fetchOhlc(symbol, '1', fromIntraday),
+      fetchOhlc(symbol, 'D', fromDaily),
+      fetchIndexOhlc('VNINDEX', '1', fromIntraday),
+      fetchIndexOhlc('VNINDEX', 'D', fromDaily),
+      fetchIndexOhlc('HNX', 'D', fromDaily),
+      fetchIndexOhlc('UPCOM', 'D', fromDaily),
       fetchLatestStockNews(symbol),
       fetchFinancialStatements(symbol)
     ]);
-
-    const stock1mData = stock1mRes && stock1mRes.ok ? await stock1mRes.json() : null;
-    const stock1dData = stock1dRes && stock1dRes.ok ? await stock1dRes.json() : null;
-    const vn1mData = vnIndex1mRes && vnIndex1mRes.ok ? await vnIndex1mRes.json() : null;
-    const vn1dData = vnIndex1dRes && vnIndex1dRes.ok ? await vnIndex1dRes.json() : null;
-    const hnxData = hnxRes && hnxRes.ok ? await hnxRes.json() : null;
-    const upcomData = upcomRes && upcomRes.ok ? await upcomRes.json() : null;
 
     const computeDynamicTrend = (dailyData: any, intradayData: any, name: string) => {
       if (!dailyData || !dailyData.c || dailyData.c.length === 0) return undefined;
