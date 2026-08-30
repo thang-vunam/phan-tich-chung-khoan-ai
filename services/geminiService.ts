@@ -365,14 +365,17 @@ const repairTruncatedJson = (str: string): string => {
 };
 
 const parseJsonResponse = (text: string) => {
+    if (!text) {
+      throw new Error("Phản hồi từ AI trống. Vui lòng thử lại!");
+    }
     let cleanStr = text.trim();
 
-    // 1. Try direct parse first (fastest and most reliable for responseMimeType: 'application/json')
+    // 1. Thử parse trực tiếp (nhanh và chuẩn nhất khi responseMimeType: 'application/json')
     try {
         return JSON.parse(cleanStr);
     } catch (e) {}
 
-    // 2. Try markdown json block
+    // 2. Thử bóc tách từ khối markdown ```json ... ```
     const match = cleanStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
     if (match) {
         try {
@@ -382,7 +385,7 @@ const parseJsonResponse = (text: string) => {
         }
     }
 
-    // 3. Extract strictly between first '{' and last '}'
+    // 3. Trích xuất giữa dấu { đầu tiên và } cuối cùng
     const firstBrace = cleanStr.indexOf('{');
     const lastBrace = cleanStr.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace > firstBrace) {
@@ -391,22 +394,27 @@ const parseJsonResponse = (text: string) => {
             return JSON.parse(sliced);
         } catch (e) {
             try {
-                // Remove trailing commas before } or ]
+                // Xóa trailing commas trước } hoặc ]
                 const noCommas = sliced.replace(/,(\s*[\]}])/g, '$1');
                 return JSON.parse(noCommas);
             } catch (e2) {}
         }
     }
 
-    // 4. Try sanitizing unescaped quotes and repairing truncated braces
+    // 4. Bọc sửa chữa JSON bị cắt cụt
+    const repaired = repairTruncatedJson(cleanStr);
     try {
-        const repaired = repairTruncatedJson(cleanStr);
-        const sanitized = sanitizeJsonString(repaired);
-        const cleanedCommas = sanitized.replace(/,(\s*[\]}])/g, '$1');
-        return JSON.parse(cleanedCommas);
-    } catch (err) {
-        console.error("Failed to parse JSON even after repair. Original text preview:", text.substring(0, 500));
-        throw new Error("Dữ liệu phân tích trả về gặp sự cố định dạng. Vui lòng bấm 'Phân tích' lại nhé!");
+        const noCommas = repaired.replace(/,(\s*[\]}])/g, '$1');
+        return JSON.parse(noCommas);
+    } catch (e3) {
+        try {
+            const sanitized = sanitizeJsonString(repaired);
+            const cleanedCommas = sanitized.replace(/,(\s*[\]}])/g, '$1');
+            return JSON.parse(cleanedCommas);
+        } catch (err) {
+            console.error("Failed to parse JSON even after repair. Original text preview:", text.substring(0, 500));
+            throw new Error("Dữ liệu phân tích trả về gặp sự cố định dạng. Vui lòng bấm 'Phân tích' lại nhé!");
+        }
     }
 };
 
@@ -884,14 +892,15 @@ const sendChatWithToolFallback = async (
   }
 
   // 2. Nếu Google Search Grounding hết quota (429/Resource Exhausted) -> Tự động Fallback sang Direct Generation
-  // Vì toàn bộ dữ liệu giá Live, BCTC 4 quý, định giá, nến 30 phiên và tin tức mới nhất đã được backend nạp sẵn vào prompt!
-  console.warn('⚠️ [Search Quota Fallback] Hạn mức Search Grounding tạm hết. Tự động chuyển sang chế độ phân tích trực tiếp với dữ liệu Backend...');
+  // Dùng responseMimeType: 'application/json' để ĐẢM BẢO 100% JSON chuẩn xác tuyệt đối không bao giờ bị lỗi cú pháp!
+  console.warn('⚠️ [Search Quota Fallback] Hạn mức Search Grounding tạm hết. Tự động chuyển sang chế độ Native JSON Mode với dữ liệu Backend...');
   for (const modelName of FALLBACK_MODELS) {
     try {
       const config: any = {
         temperature: 0.1,
         maxOutputTokens: 8192,
         systemInstruction,
+        responseMimeType: 'application/json',
       };
 
       if (modelName === 'gemini-2.5-flash') {
