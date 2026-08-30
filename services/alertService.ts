@@ -27,9 +27,15 @@ export const alertService = {
   
   removeFromWatchlist(ticker: string): WatchlistItem[] {
     const list = this.getWatchlist();
-    const newList = list.filter(i => i.symbol !== ticker);
+    const newList = list.filter(i => i.symbol !== ticker.toUpperCase());
     localStorage.setItem(STORAGE_KEYS.WATCHLIST, JSON.stringify(newList));
     return newList;
+  },
+
+  isWatched(ticker: string): boolean {
+    if (!ticker) return false;
+    const list = this.getWatchlist();
+    return list.some(i => i.symbol === ticker.toUpperCase());
   },
 
   // Alerts

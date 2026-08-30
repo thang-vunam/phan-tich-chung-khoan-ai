@@ -209,7 +209,14 @@ async function fetchFinancialStatements(symbol: string): Promise<FinancialStatem
     const equity = latestItem.bs10 || 1;
     const totalAssets = latestItem.bs1 || 1;
 
-    const eps = Math.round(totalNp / sharesOutstanding);
+    // Chuẩn hóa EPS hàng nghìn VND/cp, không để bị số nhỏ hoặc N/A
+    const calculatedEps = Math.round(totalNp / sharesOutstanding);
+    let normalizedOp4: number | undefined = undefined;
+    if (latestItem.op4 !== undefined && latestItem.op4 !== null && !isNaN(latestItem.op4)) {
+      normalizedOp4 = (latestItem.op4 < 100 && latestItem.op4 > 0) ? Math.round(latestItem.op4 * 1000) : Math.round(latestItem.op4);
+    }
+    const eps = calculatedEps !== 0 ? calculatedEps : (normalizedOp4 || 0);
+
     const bvps = Math.round(equity / sharesOutstanding);
     const roe = Number(((totalNp / equity) * 100).toFixed(1));
     const roa = Number(((totalNp / totalAssets) * 100).toFixed(1));
@@ -259,11 +266,10 @@ export default async function handler(req: any, res: any) {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const fromIntraday = now - 3600 * 6; // 6 giờ gần nhất (nến 1 phút trong phiên)
-  const fromDaily = now - 86400 * 30; // 30 ngày nến để tính đỉnh đáy và xu hướng động
+  const fromIntraday = now - 3600 * 6; // 6 giờ gần nhất
+  const fromDaily = now - 86400 * 30; // 30 ngày nến
 
   try {
-    // Chạy song song: Lấy giá Live 1-phút trong phiên + Nến ngày lịch sử + Nến 30 phiên của 3 sàn (HOSE, HNX, UPCOM) + Tin tức kép + BCTC Simplize
     const [stock1mRes, stock1dRes, vnIndex1mRes, vnIndex1dRes, hnxRes, upcomRes, newsItems, financials] = await Promise.all([
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromIntraday}&to=${now}&symbol=${symbol}&resolution=1`).catch(() => null),
       fetch(`https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?from=${fromDaily}&to=${now}&symbol=${symbol}&resolution=1D`).catch(() => null),
@@ -275,45 +281,26 @@ export default async function handler(req: any, res: any) {
       fetchFinancialStatements(symbol)
     ]);
 
-    const parseJson = async (resObj: any) => {
-      if (!resObj || !resObj.ok) return undefined;
-      try {
-        return await resObj.json();
-      } catch (e) {
-        return undefined;
-      }
-    };
+    const stock1mData = stock1mRes && stock1mRes.ok ? await stock1mRes.json() : null;
+    const stock1dData = stock1dRes && stock1dRes.ok ? await stock1dRes.json() : null;
+    const vn1mData = vnIndex1mRes && vnIndex1mRes.ok ? await vnIndex1mRes.json() : null;
+    const vn1dData = vnIndex1dRes && vnIndex1dRes.ok ? await vnIndex1dRes.json() : null;
+    const hnxData = hnxRes && hnxRes.ok ? await hnxRes.json() : null;
+    const upcomData = upcomRes && upcomRes.ok ? await upcomRes.json() : null;
 
-    const [stock1mData, stock1dData, vn1mData, vn1dData, hnxData, upcomData] = await Promise.all([
-      parseJson(stock1mRes),
-      parseJson(stock1dRes),
-      parseJson(vnIndex1mRes),
-      parseJson(vnIndex1dRes),
-      parseJson(hnxRes),
-      parseJson(upcomRes)
-    ]);
-
-    if (!stock1mData && !stock1dData) {
-      return res.status(404).json({ error: `Không tìm thấy dữ liệu giao dịch cho mã ${symbol}` });
-    }
-
-    const computeDynamicTrend = (dailyData: any, live1mData: any, name: string) => {
+    const computeDynamicTrend = (dailyData: any, intradayData: any, name: string) => {
       if (!dailyData || !dailyData.c || dailyData.c.length === 0) return undefined;
       const count = dailyData.c.length;
       let current = dailyData.c[count - 1];
-
-      // Nếu có nến 1 phút Live hôm nay, cập nhật điểm số chính xác đến từng phút
-      if (live1mData && live1mData.c && live1mData.c.length > 0) {
-        current = live1mData.c[live1mData.c.length - 1];
+      
+      if (intradayData && intradayData.c && intradayData.c.length > 0) {
+        current = intradayData.c[intradayData.c.length - 1];
       }
 
-      const sampleSize = Math.min(count, 15);
-      const highs = dailyData.h ? dailyData.h.slice(-sampleSize) : [current];
-      const lows = dailyData.l ? dailyData.l.slice(-sampleSize) : [current];
-      
-      const highest = Math.max(...highs);
-      const lowest = Math.min(...lows);
-      
+      const recentHighs = dailyData.h ? dailyData.h.slice(-20) : [current];
+      const recentLows = dailyData.l ? dailyData.l.slice(-20) : [current];
+      const highest = Math.max(...recentHighs);
+      const lowest = Math.min(...recentLows);
       const pctFromHigh = ((current - highest) / highest) * 100;
       const pctFromLow = ((current - lowest) / lowest) * 100;
       
@@ -331,22 +318,12 @@ export default async function handler(req: any, res: any) {
       const sampleVol = dailyData.v ? dailyData.v.slice(-20) : [];
       const avgVol20 = sampleVol.length > 0 ? (sampleVol.reduce((a: number, b: number) => a + (b || 0), 0) / sampleVol.length) : 0;
       const estTurnover = Math.round((avgVol20 * 23000) / 1e9);
-      const liquidityDescription = avgVol20 > 0 
-        ? `khớp lệnh bình quân 20 phiên đạt ~${Math.round(avgVol20 / 1e6)} triệu cp/phiên (tương đương ~${estTurnover.toLocaleString('vi-VN')} tỷ đồng/phiên)`
-        : undefined;
 
       return {
         name,
         points: Number(current.toFixed(2)),
         formatted: `${Number(current.toFixed(2)).toLocaleString('vi-VN')} điểm`,
-        highest: Number(highest.toFixed(2)),
-        lowest: Number(lowest.toFixed(2)),
-        pctFromHigh: Number(pctFromHigh.toFixed(2)),
-        pctFromLow: Number(pctFromLow.toFixed(2)),
-        volume: dailyData.v ? dailyData.v[count - 1] : undefined,
-        avgVolume20: Math.round(avgVol20),
-        estimatedTurnover20: estTurnover,
-        liquidityDescription,
+        liquidityDescription: `khớp lệnh bình quân 20 phiên đạt ~${Math.round(avgVol20 / 1e6)} triệu cp/phiên`,
         trendDescription
       };
     };
@@ -355,35 +332,35 @@ export default async function handler(req: any, res: any) {
     const hnxInfo = computeDynamicTrend(hnxData, null, 'HNX-INDEX');
     const upcomInfo = computeDynamicTrend(upcomData, null, 'UPCOM-INDEX');
 
-    // Xác định giá Live thời gian thực của cổ phiếu
-    let lastClose = 0;
-    let lastHigh = 0;
-    let lastLow = 0;
-    let lastVol = 0;
-    let lastDateStr = '';
+    let lastClose = 0, lastHigh = 0, lastLow = 0, lastVol = 0, lastDateStr = '';
     let isLiveSession = false;
 
-    // Ưu tiên nến 1 phút Live trong phiên hôm nay
-    if (stock1mData && stock1mData.c && stock1mData.c.length > 0) {
-      const count1m = stock1mData.c.length;
+    const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
+    const vnDay = vnNow.getUTCDay();
+    const vnMins = vnNow.getUTCHours() * 60 + vnNow.getUTCMinutes();
+    const isTradingHours = vnDay >= 1 && vnDay <= 5 && vnMins >= 9 * 60 && vnMins <= 15 * 60;
+
+    const count1d = stock1dData && stock1dData.c ? stock1dData.c.length : 0;
+    const count1m = stock1mData && stock1mData.c ? stock1mData.c.length : 0;
+
+    if (isTradingHours && count1m > 0) {
       lastClose = stock1mData.c[count1m - 1];
       lastHigh = Math.max(...stock1mData.h);
       lastLow = Math.min(...stock1mData.l);
-      lastVol = stock1mData.v.reduce((sum: number, v: number) => sum + (v || 0), 0);
-      lastDateStr = new Date(stock1mData.t[count1m - 1] * 1000).toLocaleTimeString('vi-VN') + ' ' + new Date(stock1mData.t[count1m - 1] * 1000).toLocaleDateString('vi-VN');
+      lastVol = count1d > 0 && stock1dData.v ? stock1dData.v[count1d - 1] : stock1mData.v.reduce((sum: number, v: number) => sum + (v || 0), 0);
+      lastDateStr = new Date(stock1mData.t[count1m - 1] * 1000).toLocaleTimeString('vi-VN');
       isLiveSession = true;
-    } else if (stock1dData && stock1dData.c && stock1dData.c.length > 0) {
-      const count1d = stock1dData.c.length;
+    } else if (count1d > 0) {
       lastClose = stock1dData.c[count1d - 1];
       lastHigh = stock1dData.h ? stock1dData.h[count1d - 1] : lastClose;
       lastLow = stock1dData.l ? stock1dData.l[count1d - 1] : lastClose;
       lastVol = stock1dData.v ? stock1dData.v[count1d - 1] : 0;
-      lastDateStr = stock1dData.t ? new Date(stock1dData.t[count1d - 1] * 1000).toLocaleDateString('vi-VN') : '';
+      lastDateStr = new Date(stock1dData.t[count1d - 1] * 1000).toLocaleDateString('vi-VN');
+      isLiveSession = false;
     }
 
     const priceVND = Math.round(lastClose * 1000);
 
-    // Tính P/E và P/B theo giá thị trường thực tế
     if (financials && financials.valuationMetrics && priceVND > 0) {
       const eps = financials.valuationMetrics.eps;
       const bvps = financials.valuationMetrics.bvps;

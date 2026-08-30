@@ -37,9 +37,9 @@ export const exportElementToPdf = async (
 
     const rootRect = element.getBoundingClientRect();
 
-    // 3. Render element to high-res canvas with natural web app sizing
+    // 3. Render element to high-res canvas with natural web app sizing and sharp Vietnamese typography
     const canvas = await html2canvas(element, {
-      scale: 2,
+      scale: 2.5,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#111827', // Matching dark theme
@@ -47,6 +47,22 @@ export const exportElementToPdf = async (
       scrollX: 0,
       scrollY: -window.scrollY,
       windowWidth: element.scrollWidth || 1024,
+      onclone: (clonedDoc) => {
+        const style = clonedDoc.createElement('style');
+        style.innerHTML = `
+          * {
+            text-rendering: optimizeLegibility !important;
+            -webkit-font-smoothing: antialiased !important;
+          }
+          strong, b, .font-bold, .font-semibold, .font-extrabold, th, h1, h2, h3, h4 {
+            letter-spacing: 0.025em !important;
+          }
+          table, td, th {
+            border-collapse: collapse !important;
+          }
+        `;
+        clonedDoc.head.appendChild(style);
+      }
     });
 
     const canvasWidth = canvas.width;

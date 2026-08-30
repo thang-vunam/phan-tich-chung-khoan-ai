@@ -119,6 +119,7 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ analysis, tick
   const recommendationAppearance = getRecommendationAppearance(analysis.recommendation.action);
   const reportTopRef = useRef<HTMLDivElement>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isWatched, setIsWatched] = useState(false);
 
   const isIndex = Boolean(ticker && (
     ticker.toUpperCase().includes('INDEX') ||
@@ -129,11 +130,28 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ analysis, tick
   ));
 
   useEffect(() => {
+    if (ticker) {
+      setIsWatched(alertService.isWatched(ticker));
+    }
+  }, [ticker]);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       reportTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
     return () => clearTimeout(timer);
   }, [analysis]);
+
+  const handleToggleWatchlist = () => {
+    if (!ticker) return;
+    if (isWatched) {
+      alertService.removeFromWatchlist(ticker);
+      setIsWatched(false);
+    } else {
+      alertService.addToWatchlist(ticker);
+      setIsWatched(true);
+    }
+  };
 
   const handleExportPdf = async () => {
     if (!reportTopRef.current || isExportingPdf) return;
@@ -164,7 +182,22 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ analysis, tick
           <p className="text-gray-400 mt-1">Dữ liệu tính đến ngày {analysis.assumedDate}</p>
         </div>
 
-        <div className="flex items-center gap-2" data-pdf-ignore="true">
+        <div className="flex items-center gap-2 flex-wrap" data-pdf-ignore="true">
+          {!isIndex && (
+            <button
+              onClick={handleToggleWatchlist}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border shadow-md ${
+                isWatched
+                  ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/50 hover:bg-yellow-500/25'
+                  : 'bg-gray-800 text-gray-300 border-gray-700 hover:text-yellow-400 hover:border-gray-600'
+              }`}
+              title={isWatched ? 'Đã lưu trong danh mục theo dõi' : 'Thêm vào danh mục theo dõi'}
+            >
+              <StarIcon className={`w-4 h-4 ${isWatched ? 'text-yellow-400 fill-yellow-400' : ''}`} />
+              <span>{isWatched ? 'Đã theo dõi' : 'Theo dõi'}</span>
+            </button>
+          )}
+
           <button
             onClick={handleExportPdf}
             disabled={isExportingPdf}
@@ -194,17 +227,6 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ analysis, tick
       </div>
 
       <div className={`p-6 rounded-xl border-2 shadow-lg ${recommendationAppearance.border} ${recommendationAppearance.bg} relative`}>
-        <button 
-            data-pdf-ignore="true"
-            onClick={() => {
-              alertService.addToWatchlist(ticker);
-              alert(`Đã thêm ${ticker} vào danh mục theo dõi!`);
-            }}
-            className="absolute top-4 right-4 p-2 rounded-full bg-gray-800/50 text-gray-400 hover:text-yellow-400 transition-all flex items-center gap-2 px-3 text-xs font-bold border border-gray-700 shadow-sm"
-        >
-            <StarIcon className="w-4 h-4" />
-            Lưu mã
-        </button>
         <div className="flex flex-col items-center text-center gap-2">
           <p className="text-sm font-medium text-gray-400">Khuyến nghị chiến lược</p>
           <div className={`flex items-center gap-4 ${recommendationAppearance.text}`}>

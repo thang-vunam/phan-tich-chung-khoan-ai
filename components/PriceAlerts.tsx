@@ -34,73 +34,96 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ onSelectTicker, curren
   };
 
   return (
-    <div className={`fixed right-4 bottom-4 z-50 transition-all duration-300 ${isExpanded ? 'w-80 h-[500px]' : 'w-12 h-12'}`}>
-      {!isExpanded ? (
-        <button 
-          onClick={() => setIsExpanded(true)}
-          className="w-full h-full bg-cyan-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-cyan-500 transition-colors"
-        >
-          <StarIcon className="w-6 h-6" />
-        </button>
-      ) : (
-        <div className="w-full h-full bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-          <div className="p-4 bg-gray-900 border-b border-gray-700 flex justify-between items-center">
-            <h3 className="font-bold text-cyan-400 flex items-center gap-2">
-              <StarIconSolid className="w-5 h-5" />
-              Danh mục theo dõi
-            </h3>
-            <button onClick={() => setIsExpanded(false)} className="text-gray-400 hover:text-white">
-              <XMarkIcon className="w-5 h-5" />
-            </button>
-          </div>
+    <>
+      {isExpanded && (
+        <div 
+          onClick={() => setIsExpanded(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 sm:hidden transition-opacity"
+        />
+      )}
 
-          <div className="flex-1 overflow-y-auto p-2 space-y-2">
-            {watchlist.length === 0 ? (
-              <div className="text-center py-10 text-gray-500 italic text-sm">
-                Chưa có mã nào trong danh sách.
-              </div>
-            ) : (
-              watchlist.map((item) => (
-                <div 
-                  key={item.symbol}
-                  onClick={() => onSelectTicker(item.symbol)}
-                  className="p-3 bg-gray-700/50 hover:bg-gray-700 rounded-xl cursor-pointer flex justify-between items-center group transition-all"
-                >
-                  <div>
-                    <div className="font-bold text-white">{item.symbol}</div>
-                    <div className="text-[10px] text-gray-400">Added: {new Date(item.addedAt).toLocaleDateString()}</div>
-                  </div>
-                  <button 
-                    onClick={(e) => handleRemove(e, item.symbol)}
-                    className="opacity-0 group-hover:opacity-100 p-2 text-gray-500 hover:text-red-400 transition-all"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-
-          {currentTicker && (
-            <div className="p-4 bg-gray-900 border-t border-gray-700">
+      <div className={`fixed z-50 transition-all duration-300 ${
+        isExpanded 
+          ? 'inset-x-3 bottom-3 top-auto sm:inset-auto sm:right-4 sm:bottom-4 sm:w-84 h-[75vh] sm:h-[520px] max-h-[85vh]' 
+          : 'right-4 bottom-4 w-12 h-12'
+      }`}>
+        {!isExpanded ? (
+          <button 
+            onClick={() => setIsExpanded(true)}
+            className="w-full h-full bg-cyan-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-cyan-500 hover:scale-105 active:scale-95 transition-all"
+            title="Mở Danh mục theo dõi"
+          >
+            <StarIcon className="w-6 h-6" />
+          </button>
+        ) : (
+          <div className="w-full h-full bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-4 bg-gray-900 border-b border-gray-700 flex justify-between items-center">
+              <h3 className="font-bold text-cyan-400 flex items-center gap-2">
+                <StarIconSolid className="w-5 h-5 text-yellow-400" />
+                Danh mục theo dõi ({watchlist.length})
+              </h3>
               <button 
-                onClick={handleToggleWatchlist}
-                className={`w-full py-2 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${
-                  watchlist.some(i => i.symbol === currentTicker.toUpperCase())
-                  ? 'bg-red-900/20 text-red-400 border border-red-900/50 hover:bg-red-900/40'
-                  : 'bg-cyan-600 text-white hover:bg-cyan-500'
-                }`}
+                onClick={() => setIsExpanded(false)} 
+                className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
               >
-                {watchlist.some(i => i.symbol === currentTicker.toUpperCase()) ? (
-                  <>Bỏ theo dõi {currentTicker.toUpperCase()}</>
-                ) : (
-                  <>Theo dõi {currentTicker.toUpperCase()}</>
-                )}
+                <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
-          )}
-        </div>
-      )}
-    </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {watchlist.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-14 text-center px-4">
+                  <StarIcon className="w-12 h-12 text-gray-600 mb-2" />
+                  <p className="text-gray-400 font-medium">Chưa có mã nào trong danh sách</p>
+                  <p className="text-xs text-gray-500 mt-1">Bấm nút "Theo dõi" trên bất kỳ mã nào để lưu lại tại đây.</p>
+                </div>
+              ) : (
+                watchlist.map((item) => (
+                  <div 
+                    key={item.symbol}
+                    onClick={() => {
+                      onSelectTicker(item.symbol);
+                      setIsExpanded(false);
+                    }}
+                    className="p-3 bg-gray-700/50 hover:bg-gray-700/80 rounded-xl cursor-pointer flex justify-between items-center group transition-all border border-gray-700/50 hover:border-cyan-500/50"
+                  >
+                    <div>
+                      <div className="font-bold text-lg text-white group-hover:text-cyan-400 transition-colors">{item.symbol}</div>
+                      <div className="text-[11px] text-gray-400">{item.name || 'Theo dõi thị giá'}</div>
+                    </div>
+                    <button 
+                      onClick={(e) => handleRemove(e, item.symbol)}
+                      className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                      title="Xóa khỏi danh mục"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {currentTicker && (
+              <div className="p-3 bg-gray-900 border-t border-gray-700">
+                <button 
+                  onClick={handleToggleWatchlist}
+                  className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                    watchlist.some(i => i.symbol === currentTicker.toUpperCase())
+                    ? 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20'
+                    : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500 shadow-md'
+                  }`}
+                >
+                  {watchlist.some(i => i.symbol === currentTicker.toUpperCase()) ? (
+                    <>Bỏ theo dõi {currentTicker.toUpperCase()}</>
+                  ) : (
+                    <>Theo dõi {currentTicker.toUpperCase()}</>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 };
