@@ -427,9 +427,14 @@ export interface RealtimeStockInfo {
   ticker: string;
   price?: number;
   formattedPrice?: string;
+  prevPrice?: number;
+  change?: number;
+  changePct?: number;
+  formattedChange?: string;
   high?: number;
   low?: number;
   volume?: number;
+  avgVolume20?: number;
   vnIndex?: {
     points: number;
     formatted: string;
@@ -656,9 +661,9 @@ const generateAnalysisPrompt = (tickerSymbol: string, customPrice?: string, real
   const priceContext = customPrice 
     ? `- Giá tùy chỉnh do người dùng nhập: ${customPrice} VND` 
     : realtimeInfo 
-      ? `- Giá đóng cửa thực tế mới nhất: ${realtimeInfo.formattedPrice} (${realtimeInfo.price?.toLocaleString('vi-VN')} VND)
-- Khối lượng giao dịch: ${realtimeInfo.volume?.toLocaleString('vi-VN')} cp
-- Biên độ phiên gần nhất: ${realtimeInfo.low?.toLocaleString('vi-VN')} VND - ${realtimeInfo.high?.toLocaleString('vi-VN')} VND`
+      ? `- Giá đóng cửa phiên gần nhất: ${realtimeInfo.formattedPrice} (${realtimeInfo.formattedChange || 'không đổi so với phiên trước'})
+- Khối lượng khớp lệnh phiên gần nhất: ${realtimeInfo.volume?.toLocaleString('vi-VN')} cp (Khối lượng bình quân 20 phiên: ~${realtimeInfo.avgVolume20 ? Math.round(realtimeInfo.avgVolume20 / 1e6).toLocaleString('vi-VN') : '20'} triệu cp/phiên)
+- Biên độ dao động phiên gần nhất: ${realtimeInfo.low?.toLocaleString('vi-VN')} VND - ${realtimeInfo.high?.toLocaleString('vi-VN')} VND`
       : `- Giá thị trường mới nhất tính đến ${formattedDate}`;
 
   const targetPriceRule = customPrice

@@ -360,6 +360,11 @@ export default async function handler(req: any, res: any) {
     }
 
     const priceVND = Math.round(lastClose * 1000);
+    const sampleVolStock = stock1dData && stock1dData.v ? stock1dData.v.slice(-20) : [];
+    const avgVol20Stock = sampleVolStock.length > 0 ? Math.round(sampleVolStock.reduce((a: number, b: number) => a + (b || 0), 0) / sampleVolStock.length) : lastVol;
+    const prevCloseVND = count1d >= 2 && stock1dData.c ? Math.round(stock1dData.c[count1d - 2] * 1000) : priceVND;
+    const changeVND = priceVND - prevCloseVND;
+    const changePct = prevCloseVND > 0 ? Number(((changeVND / prevCloseVND) * 100).toFixed(2)) : 0;
 
     if (financials && financials.valuationMetrics && priceVND > 0) {
       const eps = financials.valuationMetrics.eps;
@@ -372,9 +377,14 @@ export default async function handler(req: any, res: any) {
       ticker: symbol,
       price: priceVND,
       formattedPrice: `${priceVND.toLocaleString('vi-VN')} VND`,
+      prevPrice: prevCloseVND,
+      change: changeVND,
+      changePct,
+      formattedChange: `${changeVND >= 0 ? '+' : ''}${changeVND.toLocaleString('vi-VN')} VND (${changePct >= 0 ? '+' : ''}${changePct}%)`,
       high: Math.round(lastHigh * 1000),
       low: Math.round(lastLow * 1000),
       volume: lastVol,
+      avgVolume20: avgVol20Stock,
       isLiveSession,
       vnIndex: vnIndexInfo,
       hnxIndex: hnxInfo,
