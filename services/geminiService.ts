@@ -715,9 +715,11 @@ ${financialContext}
 
 ${newsContext}
 
-QUY TẮC BẮT BUỘC VỀ BỐI CẢNH CHỈ SỐ THỊ TRƯỜNG:
+QUY TẮC BẮT BUỘC VỀ BỐI CẢNH CHỈ SỐ THỊ TRƯỜNG, THANH KHOẢN & KHỐI NGOẠI:
 - Xác định sàn niêm yết của "${tickerSymbol}" (HOSE, HNX hay UPCOM) để phân tích tương ứng.
 - Trường "marketSentiment", "vnIndexTrend" và "liquidity" BẮT BUỘC phải phân tích dựa trên bối cảnh nến thực tế của sàn: ${vnIndexDetail}.
+- Trong "foreignInvestors": BẮT BUỘC phân tích cụ thể xu hướng dòng vốn khối ngoại (áp lực bán ròng cơ cấu danh mục hoặc mua ròng ở các mã vốn hóa lớn/đầu ngành), TUYỆT ĐỐI CẤM viết câu né tránh chung chung như "Chưa có thông tin cụ thể về giao dịch của khối ngoại"!
+- Trong "liquidity": Phân tích thanh khoản giao dịch của cổ phiếu "${tickerSymbol}" (${realtimeInfo?.volume ? `${realtimeInfo.volume.toLocaleString('vi-VN')} cp` : 'thanh khoản sôi động'}) kết hợp với dòng tiền toàn thị trường.
 - TUYỆT ĐỐI KHÔNG tự ý suy diễn gán nhãn 'đỉnh lịch sử' hoặc dùng các mốc điểm cũ trong quá khứ!
 
 QUY TẮC BẮT BUỘC VỀ TỒN TẠI MÃ CỔ PHIẾU:

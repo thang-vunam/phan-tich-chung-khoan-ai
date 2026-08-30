@@ -6,7 +6,7 @@ import { IndustryAnalysisDisplay } from './components/IndustryAnalysisDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { fetchStockAnalysis, fetchStockComparison, fetchIndustryAnalysis, fetchIndexAnalysis, markdownToHtml } from './services/geminiService';
 import type { AnalysisResult, AnalysisError, ChatMessage, ComparisonResult, IndustryAnalysisResult } from './types';
-import { GlobeAltIcon, ScaleIcon, BuildingOfficeIcon, SparklesIcon } from './components/IconComponents';
+import { GlobeAltIcon, ScaleIcon, BuildingOfficeIcon, SparklesIcon, StarIconSolid } from './components/IconComponents';
 import type { Chat } from '@google/genai';
 import { ChatInterface } from './components/ChatInterface';
 import { PriceAlerts } from './components/PriceAlerts';
@@ -43,6 +43,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<AnalysisError | null>(null);
   const [ticker, setTicker] = useState<string>('');
+  const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
 
   const [chatSession, setChatSession] = useState<Chat | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -237,7 +238,18 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4 sm:p-6 lg:p-8">
       <div className="container mx-auto">
-        <header className="text-center mb-8">
+        <header className="relative flex flex-col items-center mb-8">
+          <div className="w-full flex items-center justify-between sm:justify-end mb-4 sm:mb-0 sm:absolute sm:top-0 sm:right-0">
+            <button
+              onClick={() => setIsWatchlistOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gray-800/80 border border-gray-700 hover:border-yellow-500/50 hover:bg-gray-700/80 text-gray-200 hover:text-yellow-400 text-sm font-semibold transition-all shadow-sm group"
+              title="Mở Danh mục theo dõi"
+            >
+              <StarIconSolid className="w-4 h-4 text-yellow-400 group-hover:scale-110 transition-transform" />
+              <span>Danh mục theo dõi</span>
+            </button>
+          </div>
+
           <h1 className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
             Phân tích đầu tư
           </h1>
@@ -326,7 +338,12 @@ const App: React.FC = () => {
           </div>
         </footer>
       </div>
-      <PriceAlerts onSelectTicker={handleAnalyze} currentTicker={ticker} />
+      <PriceAlerts 
+        isOpen={isWatchlistOpen} 
+        onClose={() => setIsWatchlistOpen(false)} 
+        onSelectTicker={handleAnalyze} 
+        currentTicker={ticker} 
+      />
     </div>
   );
 };
