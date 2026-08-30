@@ -4,8 +4,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
-    const _bk = Buffer.from('QVEuQWI4Uk42TFZTMnVDSXRyc29wRW9XM0dTXzdQU1JBMDlzaVBZWnFTVWM0SnJZbnFRWFE=', 'base64').toString('utf-8');
-    const freeKey = env.GEMINI_FREE_API_KEY || env.GEMINI_API_KEY || process.env.GEMINI_FREE_API_KEY || process.env.GEMINI_API_KEY || _bk;
+    const _bk1 = Buffer.from('QVEuQWI4Uk42TFZTMnVDSXRyc29wRW9XM0dTXzdQU1JBMDlzaVBZWnFTVWM0SnJZbnFRWFE=', 'base64').toString('utf-8');
+    const _bk2 = Buffer.from('QVEuQWI4Uk42S1JCWUxmb1JkZXBwcHZINkgxN3hjWThyMUtKSGJycnNOUjItekxyY1ZUR0E=', 'base64').toString('utf-8');
+    const freeKey = env.GEMINI_FREE_API_KEY || env.GEMINI_API_KEY || process.env.GEMINI_FREE_API_KEY || process.env.GEMINI_API_KEY || _bk1;
+    const backupKey = env.GEMINI_BACKUP_API_KEY || process.env.GEMINI_BACKUP_API_KEY || _bk2;
     const paidKey = env.GEMINI_PAID_API_KEY || process.env.GEMINI_PAID_API_KEY || '';
 
     return {
@@ -18,6 +20,7 @@ export default defineConfig(({ mode }) => {
         'process.env.API_KEY': JSON.stringify(freeKey || paidKey),
         'process.env.GEMINI_API_KEY': JSON.stringify(freeKey || paidKey),
         'process.env.GEMINI_FREE_API_KEY': JSON.stringify(freeKey),
+        'process.env.GEMINI_BACKUP_API_KEY': JSON.stringify(backupKey),
         'process.env.GEMINI_PAID_API_KEY': JSON.stringify(paidKey)
       },
       resolve: {

@@ -2,8 +2,8 @@
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import type { AnalysisResult, ComparisonResult, GroundingSource, MarketSentiment, IndustryAnalysisResult, NewsItem } from '../types';
 
-const PRO_MODEL = 'gemini-2.5-flash';
-const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash'];
+const PRO_MODEL = 'gemini-3.5-flash-lite';
+const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-3.6-flash'];
 
 const extractGroundingSources = (response: GenerateContentResponse): GroundingSource[] => {
     const sources: GroundingSource[] = [];
@@ -779,24 +779,21 @@ Trả về đúng JSON theo cấu trúc:
 };
 
 // ==========================================
-// CƠ CHẾ QUẢN LÝ VÀ FALLBACK API KEY (FREE => PAID)
+// CƠ CHẾ QUẢN LÝ VÀ FALLBACK API KEY (KEY POOL ROTATOR & SEARCH-TO-DIRECT FALLBACK)
 // ==========================================
-const FREE_KEY = (process.env.GEMINI_FREE_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
+const FREE_KEY_1 = (process.env.GEMINI_FREE_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
+const FREE_KEY_2 = (process.env.GEMINI_BACKUP_API_KEY || '').trim();
 const PAID_KEY = (process.env.GEMINI_PAID_API_KEY || '').trim();
 
-let activeKeyType: 'free' | 'paid' = FREE_KEY ? 'free' : 'paid';
+const ALL_KEYS = Array.from(new Set([FREE_KEY_1, FREE_KEY_2, PAID_KEY].filter(Boolean)));
+let currentKeyIndex = 0;
 
 export const getKeyStatus = () => ({
-  mode: activeKeyType,
-  hasFreeKey: Boolean(FREE_KEY),
+  mode: currentKeyIndex === 0 ? 'primary' : 'backup',
+  totalKeys: ALL_KEYS.length,
+  hasFreeKey: Boolean(FREE_KEY_1 || FREE_KEY_2),
   hasPaidKey: Boolean(PAID_KEY),
 });
-
-const getActiveApiKey = () => {
-  if (activeKeyType === 'free' && FREE_KEY) return FREE_KEY;
-  if (PAID_KEY) return PAID_KEY;
-  return FREE_KEY;
-};
 
 const shouldFallbackToPaid = (error: any): boolean => {
   const msg = (error?.message || error?.toString() || '').toLowerCase();
@@ -804,10 +801,12 @@ const shouldFallbackToPaid = (error: any): boolean => {
   return (
     status === 429 ||
     status === 403 ||
+    status === 404 ||
     status === 503 ||
     status === 500 ||
     status === 504 ||
     msg.includes('429') ||
+    msg.includes('404') ||
     msg.includes('503') ||
     msg.includes('500') ||
     msg.includes('quota') ||
@@ -822,43 +821,29 @@ const shouldFallbackToPaid = (error: any): boolean => {
   );
 };
 
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
 const executeWithKeyFallback = async <T>(operation: (ai: GoogleGenAI) => Promise<T>): Promise<T> => {
-  const currentKey = getActiveApiKey();
-  const ai = new GoogleGenAI({ apiKey: currentKey });
+  if (ALL_KEYS.length === 0) {
+    throw new Error('Chưa cấu hình API Key. Vui lòng kiểm tra lại cấu hình.');
+  }
 
-  try {
-    return await operation(ai);
-  } catch (error: any) {
-    // Nếu đang dùng Key Free mà bị lỗi (429, 503 quá tải, 500...), lập tức chuyển sang Key Paid
-    if (shouldFallbackToPaid(error) && activeKeyType === 'free' && PAID_KEY) {
-      console.warn('⚠️ [API Key Manager] Key Free gặp sự cố (Hết hạn mức hoặc Server 503 quá tải). Tự động kích hoạt Key Paid ngay lập tức!');
-      activeKeyType = 'paid';
-      const paidAi = new GoogleGenAI({ apiKey: PAID_KEY });
-      
-      try {
-        return await operation(paidAi);
-      } catch (paidError: any) {
-        // Nếu Key Paid gặp 503 tạm thời, thử lại 1 lần sau 1.5s
-        if (shouldFallbackToPaid(paidError)) {
-          console.warn('⚠️ [API Key Manager] Server Google đang nghẽn tạm thời, tự động thử lại sau 1.5 giây...');
-          await delay(1500);
-          return await operation(paidAi);
-        }
-        throw paidError;
+  let lastErr: any = null;
+  for (let i = 0; i < ALL_KEYS.length; i++) {
+    const keyToUse = ALL_KEYS[(currentKeyIndex + i) % ALL_KEYS.length];
+    const ai = new GoogleGenAI({ apiKey: keyToUse });
+
+    try {
+      const result = await operation(ai);
+      currentKeyIndex = (currentKeyIndex + i) % ALL_KEYS.length;
+      return result;
+    } catch (error: any) {
+      lastErr = error;
+      if (shouldFallbackToPaid(error)) {
+        console.warn(`⚠️ [API Key Rotator] Key ${i + 1}/${ALL_KEYS.length} gặp sự cố (${error?.status || '429/503'}). Đang tự động chuyển sang Key tiếp theo...`);
       }
     }
-    
-    // Nếu đang ở Key Paid mà gặp 503, tự động retry sau 1.5s
-    if (shouldFallbackToPaid(error)) {
-      console.warn('⚠️ [API Key Manager] Thử lại yêu cầu sau 1.5 giây...');
-      await delay(1500);
-      return await operation(ai);
-    }
-
-    throw error;
   }
+
+  throw lastErr;
 };
 
 const sendChatWithToolFallback = async (
@@ -868,6 +853,7 @@ const sendChatWithToolFallback = async (
 ): Promise<{ response: GenerateContentResponse; chat: Chat }> => {
   let lastError: any = null;
 
+  // 1. Thử gọi với Google Search Grounding tool trước
   for (const modelName of FALLBACK_MODELS) {
     try {
       const config: any = {
@@ -877,7 +863,6 @@ const sendChatWithToolFallback = async (
         tools: [{ googleSearch: {} }],
       };
 
-      // Chỉ thêm thinkingConfig cho gemini-2.5-flash (tránh lỗi 400 INVALID_ARGUMENT ở các model khác)
       if (modelName === 'gemini-2.5-flash') {
         config.thinkingConfig = { thinkingBudget: 0 };
       }
@@ -893,12 +878,43 @@ const sendChatWithToolFallback = async (
         return { response, chat };
       }
     } catch (err: any) {
-      console.warn(`Model ${modelName} encountered error:`, err?.message || err);
+      console.warn(`[Grounding Tool] Model ${modelName} encountered error:`, err?.message || err);
       lastError = err;
     }
   }
 
-  // Format friendly message if 429
+  // 2. Nếu Google Search Grounding hết quota (429/Resource Exhausted) -> Tự động Fallback sang Direct Generation
+  // Vì toàn bộ dữ liệu giá Live, BCTC 4 quý, định giá, nến 30 phiên và tin tức mới nhất đã được backend nạp sẵn vào prompt!
+  console.warn('⚠️ [Search Quota Fallback] Hạn mức Search Grounding tạm hết. Tự động chuyển sang chế độ phân tích trực tiếp với dữ liệu Backend...');
+  for (const modelName of FALLBACK_MODELS) {
+    try {
+      const config: any = {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        systemInstruction,
+      };
+
+      if (modelName === 'gemini-2.5-flash') {
+        config.thinkingConfig = { thinkingBudget: 0 };
+      }
+
+      const chat = ai.chats.create({
+        model: modelName,
+        config,
+      });
+      const response = await chat.sendMessage({ message });
+      
+      const text = response.text || '';
+      if (text.trim()) {
+        return { response, chat };
+      }
+    } catch (err: any) {
+      console.warn(`[Direct Fallback] Model ${modelName} encountered error:`, err?.message || err);
+      lastError = err;
+    }
+  }
+
+  // Format friendly message if still 429
   const errMsg = lastError?.message || lastError?.toString() || '';
   if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota')) {
     throw new Error('⚠️ Hạn mức gọi API Google Gemini của tài khoản tạm thời đạt giới hạn trong ngày/phút. Vui lòng đợi trong giây lát hoặc thử lại sau!');
